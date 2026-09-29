@@ -5,4 +5,5 @@ site/.wrangler/
 site/.sites-runtime/
 site/tsconfig.tsbuildinfo
 site/.env*
+site/.dev.vars
 *.tar.gz

@@ -51,6 +51,7 @@ test('선의 실패 카드 금지와 실패 카드 제출자 비공개', () => {
   assert.equal(g.quests[0].fails,1);
   assert.equal(g.quests[0].result,'FAIL');
   assert.equal(JSON.stringify(observe(g)).includes('"cards"'),false);
+  assert.equal(JSON.stringify(observe(g)).includes('"privateCards"'),false);
 });
 
 test('성공 3회 후 정확·오답 암살', () => {

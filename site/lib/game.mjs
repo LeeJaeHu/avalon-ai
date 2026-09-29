@@ -13,7 +13,7 @@ export function createGame(random = Math.random) {
   }
   return { id: crypto.randomUUID(), version: 0, phase: 'PROPOSE', quest: 0, attempt: 1,
     leader: IDS[Math.floor(random() * 5)], roles: Object.fromEntries(IDS.map((id, i) => [id, shuffled[i]])),
-    proposals: [], quests: [], messages: [], team: null, votes: {}, cards: {}, winner: null,
+    proposals: [], quests: [], messages: [], team: null, votes: {}, cards: {}, privateCards: [], winner: null,
     pendingSpeech: null, createdAt: new Date().toISOString() };
 }
 
@@ -75,6 +75,8 @@ export function apply(game, actor, action) {
     requireThat(next.phase === 'QUEST' && next.team.includes(actor) && !Object.hasOwn(next.cards, actor), '지금 임무 카드를 낼 수 없습니다.');
     requireThat(['SUCCESS', 'FAIL'].includes(action.choice) && (evil(next.roles[actor]) || action.choice === 'SUCCESS'), '허용되지 않는 카드입니다.');
     next.cards[actor] = action.choice;
+    next.privateCards ??= [];
+    next.privateCards.push({ quest: next.quest + 1, actor, choice: action.choice });
     if (Object.keys(next.cards).length === next.team.length) {
       const fails = Object.values(next.cards).filter(x => x === 'FAIL').length;
       next.quests.push({ id: `quest-${next.quest + 1}`, proposalId: next.proposals.at(-1).id,
