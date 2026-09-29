@@ -1,0 +1,8 @@
+site/node_modules/
+site/dist/
+site/.next/
+site/.wrangler/
+site/.sites-runtime/
+site/tsconfig.tsbuildinfo
+site/.env*
+*.tar.gz
