@@ -24,6 +24,7 @@ for (let i=0;i<80 && game.phase!=='ENDED';i++) {
   if (game.aiPending) await request('ADVANCE');
   else if (game.phase==='PROPOSE') await request('PROPOSE', { team: game.ids.slice(0,game.size) });
   else if (game.phase==='VOTE') await request('VOTE', { choice:'APPROVE' });
+  else if (game.phase==='VOTE_RESULT' || game.phase==='QUEST_RESULT') await request('CONTINUE');
   else if (game.phase==='QUEST' && game.team.includes('human')) await request('CARD', { choice:'SUCCESS' });
   else if (game.phase==='ASSASSINATE' && game.role==='ASSASSIN') await request('ASSASSINATE', { target:game.ids.find(id=>id!=='human') });
   else throw new Error('진행 불가: '+JSON.stringify({phase:game.phase,aiPending:game.aiPending}));

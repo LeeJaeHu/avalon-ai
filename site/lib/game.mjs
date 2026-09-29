@@ -71,9 +71,7 @@ export function apply(game, actor, action) {
       p.votes = IDS.map(id => ({ actor: id, choice: next.votes[id] }));
       p.approveCount = p.votes.filter(v => v.choice === 'APPROVE').length;
       p.status = p.approveCount >= 3 ? 'APPROVED' : 'REJECTED';
-      if (p.status === 'APPROVED') { next.phase = 'QUEST'; next.cards = {}; }
-      else if (next.attempt === 5) { next.phase = 'ENDED'; next.winner = 'EVIL'; }
-      else { next.phase = 'PROPOSE'; next.attempt++; next.leader = IDS[(IDS.indexOf(next.leader) + 1) % 5]; next.team = null; }
+      next.phase = 'VOTE_RESULT';
     }
   } else if (type === 'CARD') {
     requireThat(next.phase === 'QUEST' && next.team.includes(actor) && !Object.hasOwn(next.cards, actor), '지금 임무 카드를 낼 수 없습니다.');
@@ -85,12 +83,22 @@ export function apply(game, actor, action) {
       const fails = Object.values(next.cards).filter(x => x === 'FAIL').length;
       next.quests.push({ id: `quest-${next.quest + 1}`, proposalId: next.proposals.at(-1).id,
         team: next.team, fails, result: fails ? 'FAIL' : 'SUCCESS' });
+      next.phase = 'QUEST_RESULT';
+      next.cards = {};
+    }
+  } else if (type === 'CONTINUE') {
+    requireThat(actor === 'human' && ['VOTE_RESULT', 'QUEST_RESULT'].includes(next.phase), '확인할 결과가 없습니다.');
+    if (next.phase === 'VOTE_RESULT') {
+      const approved = next.proposals.at(-1).status === 'APPROVED';
+      if (approved) { next.phase = 'QUEST'; next.cards = {}; }
+      else if (next.attempt === 5) { next.phase = 'ENDED'; next.winner = 'EVIL'; }
+      else { next.phase = 'PROPOSE'; next.attempt++; next.leader = IDS[(IDS.indexOf(next.leader) + 1) % 5]; next.team = null; }
+    } else {
       const wins = next.quests.filter(q => q.result === 'SUCCESS').length;
       const losses = next.quests.length - wins;
       if (losses === 3) { next.phase = 'ENDED'; next.winner = 'EVIL'; }
       else if (wins === 3) next.phase = 'ASSASSINATE';
       else { next.quest++; next.attempt = 1; next.leader = IDS[(IDS.indexOf(next.leader) + 1) % 5]; next.phase = 'PROPOSE'; next.team = null; }
-      next.cards = {};
     }
   } else if (type === 'ASSASSINATE') {
     requireThat(next.phase === 'ASSASSINATE' && next.roles[actor] === 'ASSASSIN', '암살자가 아닙니다.');

@@ -8,7 +8,7 @@ const PERSONAS = {
 };
 
 export function nextAiAction(game) {
-  if (game.phase === 'ROLE_REVEAL') return null;
+  if (['ROLE_REVEAL', 'VOTE_RESULT', 'QUEST_RESULT'].includes(game.phase)) return null;
   if (game.pendingSpeech) {
     const last = game.messages.find(m => m.id === game.pendingSpeech);
     const mentioned = IDS.slice(1).find(id => last?.text.includes(NAMES[id]));

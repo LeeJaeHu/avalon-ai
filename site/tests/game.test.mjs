@@ -44,6 +44,10 @@ test('팀 크기, 비밀 투표, 5회 부결', () => {
     assert.equal('votes' in observe(g).proposals.at(-1),false);
     g=voteRest(g,['REJECT','REJECT','APPROVE','APPROVE']);
     assert.equal(g.proposals.at(-1).status,'REJECTED');
+    assert.equal(g.phase,'VOTE_RESULT');
+    assert.equal(observe(g).proposals.at(-1).votes.length,5);
+    assert.throws(()=>apply(g,'ai1',{type:'CONTINUE'}));
+    g=apply(g,'human',{type:'CONTINUE'});
   }
   assert.equal(g.winner,'EVIL');
   assert.equal(g.phase,'ENDED');
@@ -56,13 +60,19 @@ test('선의 실패 카드 금지와 실패 카드 제출자 비공개', () => {
   const good=IDS.find(id=>['LOYAL','MERLIN'].includes(g.roles[id]));
   g=apply(g,g.leader,{type:'PROPOSE',team:[evil,good]});
   g=voteAll(g,['APPROVE','APPROVE','APPROVE','REJECT','REJECT']);
+  assert.equal(g.phase,'VOTE_RESULT');
+  assert.deepEqual(observe(g).proposals.at(-1).votes.map(v=>v.choice),['APPROVE','APPROVE','APPROVE','REJECT','REJECT']);
+  g=apply(g,'human',{type:'CONTINUE'});
   assert.equal(g.phase,'QUEST');
   assert.throws(()=>apply(g,good,{type:'CARD',choice:'FAIL'}));
   g=apply(g,evil,{type:'CARD',choice:'FAIL'});
   assert.equal('cards' in observe(g),false);
   g=apply(g,good,{type:'CARD',choice:'SUCCESS'});
+  assert.equal(g.phase,'QUEST_RESULT');
   assert.equal(g.quests[0].fails,1);
   assert.equal(g.quests[0].result,'FAIL');
+  g=apply(g,'human',{type:'CONTINUE'});
+  assert.equal(g.phase,'PROPOSE');
   assert.equal(JSON.stringify(observe(g)).includes('"cards"'),false);
   assert.equal(JSON.stringify(observe(g)).includes('"privateCards"'),false);
 });
@@ -73,7 +83,12 @@ test('성공 3회 후 정확·오답 암살', () => {
     for(let quest=0;quest<3;quest++){
       g=apply(g,g.leader,{type:'PROPOSE',team:IDS.slice(0,SIZES[quest])});
       g=voteAll(g,Array(5).fill('APPROVE'));
+      assert.equal(g.phase,'VOTE_RESULT');
+      g=apply(g,'human',{type:'CONTINUE'});
       for(const id of g.team)g=apply(g,id,{type:'CARD',choice:'SUCCESS'});
+      assert.equal(g.phase,'QUEST_RESULT');
+      assert.equal(g.quests.at(-1).result,'SUCCESS');
+      g=apply(g,'human',{type:'CONTINUE'});
     }
     assert.equal(g.phase,'ASSASSINATE');
     const assassin=IDS.find(id=>g.roles[id]==='ASSASSIN');
