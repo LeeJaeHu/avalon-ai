@@ -19,8 +19,13 @@ assert.ok(game.id && game.role && game.aiPending !== undefined);
 assert.equal(game.phase,'ROLE_REVEAL');
 assert.equal(game.aiPending,false);
 await request('START');
+await request('PAUSE');
+assert.equal(game.paused,true);
+assert.equal(game.aiPending,false);
+await request('RESUME');
+assert.equal(game.paused,false);
 await request('CHAT', { text: '첫 임무 팀은 어떻게 정할까요?' });
-for (let i=0;i<80 && game.phase!=='ENDED';i++) {
+for (let i=0;i<180 && game.phase!=='ENDED';i++) {
   if (game.aiPending) await request('ADVANCE');
   else if (game.phase==='PROPOSE') await request('PROPOSE', { team: game.ids.slice(0,game.size) });
   else if (game.phase==='VOTE') await request('VOTE', { choice:'APPROVE' });

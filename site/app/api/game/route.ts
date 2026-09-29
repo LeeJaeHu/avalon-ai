@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         outputTokens: usage?.output ?? null, latencyMs: usage?.latencyMs ?? null });
       return json({ game: view(next), aiMode: mode });
     }
-    if (!['START', 'CHAT', 'PROPOSE', 'VOTE', 'CARD', 'CONTINUE', 'ASSASSINATE'].includes(body.type)) return json({ error: '허용되지 않는 행동입니다.' }, 400);
+    if (!['START', 'PAUSE', 'RESUME', 'CHAT', 'PROPOSE', 'VOTE', 'CARD', 'CONTINUE', 'ASSASSINATE'].includes(body.type)) return json({ error: '허용되지 않는 행동입니다.' }, 400);
     const next = apply(game, 'human', body);
     await save(game, next, 'human', body.type, body.type === 'CHAT' ? { length: String(body.text).length } : {});
     return json({ game: view(next), aiMode: env.GEMINI_API_KEY ? 'gemini' : 'practice' });

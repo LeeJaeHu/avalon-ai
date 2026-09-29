@@ -13,7 +13,7 @@ export function createGame(random = Math.random) {
   }
   return { id: crypto.randomUUID(), version: 0, phase: 'ROLE_REVEAL', quest: 0, attempt: 1,
     leader: IDS[Math.floor(random() * 5)], roles: Object.fromEntries(IDS.map((id, i) => [id, shuffled[i]])),
-    proposals: [], quests: [], messages: [], team: null, votes: {}, cards: {}, privateCards: [], winner: null,
+    proposals: [], quests: [], messages: [], team: null, votes: {}, cards: {}, privateCards: [], winner: null, paused: false,
     pendingSpeech: null, createdAt: new Date().toISOString() };
 }
 
@@ -28,7 +28,7 @@ export function observe(game, actor = 'human') {
       ? { id: p.id, quest: p.quest, attempt: p.attempt, leader: p.leader, team: p.team, status: p.status }
       : p), quests: game.quests, messages: game.messages,
     voted: Object.hasOwn(game.votes, actor), cardSubmitted: Object.hasOwn(game.cards, actor),
-    winner: game.winner,
+    winner: game.winner, paused: !!game.paused,
     currentProposalId: current?.id ?? null };
   if (game.phase === 'ENDED') view.roles = game.roles;
   if (game.phase === 'ENDED' && game.assassination) view.assassination = game.assassination;
@@ -45,7 +45,15 @@ export function apply(game, actor, action) {
   requireThat(game.phase !== 'ENDED', '이미 종료된 게임입니다.');
   const next = structuredClone(game);
   const type = action?.type;
-  if (type === 'START') {
+  if (type === 'PAUSE') {
+    requireThat(actor === 'human' && !next.paused, '이미 일시정지 중입니다.');
+    next.paused = true;
+  } else if (type === 'RESUME') {
+    requireThat(actor === 'human' && next.paused, '일시정지 중이 아닙니다.');
+    next.paused = false;
+  } else if (next.paused) {
+    throw new Error('게임이 일시정지 중입니다.');
+  } else if (type === 'START') {
     requireThat(actor === 'human' && next.phase === 'ROLE_REVEAL', '역할 확인 단계가 아닙니다.');
     next.phase = 'PROPOSE';
   } else if (type === 'CHAT') {

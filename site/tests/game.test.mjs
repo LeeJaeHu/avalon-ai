@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, apply, observe, observeModerator, IDS, SIZES } from '../lib/game.mjs';
+import { nextAiAction } from '../lib/ai.mjs';
 
 function seeded() { let i = 0; return () => [0.1,0.7,0.3,0.8,0.2][i++ % 5]; }
 function fresh() { return apply(createGame(seeded()),'human',{type:'START'}); }
@@ -33,6 +34,24 @@ test('역할 확인 전에는 사람과 AI 모두 게임을 진행할 수 없다
   assert.equal(started.phase,'PROPOSE');
   assert.equal(started.version,1);
   assert.throws(()=>apply(started,'human',{type:'START'}));
+});
+
+test('일시정지는 진행 상태를 보존하고 재개 전 행동과 AI 진행을 막는다', () => {
+  const g=fresh();
+  const paused=apply(g,'human',{type:'PAUSE'});
+  assert.equal(paused.phase,g.phase);
+  assert.equal(observe(paused).paused,true);
+  assert.equal(nextAiAction(paused),null);
+  assert.throws(()=>apply(paused,'human',{type:'CHAT',text:'계속'}));
+  assert.throws(()=>apply(paused,'ai1',{type:'RESUME'}));
+  assert.throws(()=>apply(paused,'human',{type:'PAUSE'}));
+  const resumed=apply(paused,'human',{type:'RESUME'});
+  assert.equal(resumed.phase,g.phase);
+  assert.equal(resumed.paused,false);
+  assert.equal(resumed.version,paused.version+1);
+  const old=structuredClone(g);
+  delete old.paused;
+  assert.equal(apply(old,'human',{type:'PAUSE'}).paused,true);
 });
 
 test('팀 크기, 비밀 투표, 5회 부결', () => {
