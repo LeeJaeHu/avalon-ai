@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame, apply, observe, observeModerator, IDS, SIZES } from '../lib/game.mjs';
 
 function seeded() { let i = 0; return () => [0.1,0.7,0.3,0.8,0.2][i++ % 5]; }
-function fresh() { return createGame(seeded()); }
+function fresh() { return apply(createGame(seeded()),'human',{type:'START'}); }
 function voteAll(g, choices) { for (let i=0;i<5;i++) g=apply(g,IDS[i],{type:'VOTE',choice:choices[i]}); return g; }
 
 test('역할 배정과 관찰 정보 경계', () => {
@@ -20,6 +20,19 @@ test('역할 배정과 관찰 정보 경계', () => {
   const mod=observeModerator(g);
   assert.equal('role' in mod,false);
   assert.equal('known' in mod,false);
+});
+
+test('역할 확인 전에는 사람과 AI 모두 게임을 진행할 수 없다', () => {
+  const g=createGame(seeded());
+  assert.equal(g.phase,'ROLE_REVEAL');
+  assert.equal(observe(g).role,g.roles.human);
+  assert.throws(()=>apply(g,'human',{type:'CHAT',text:'안녕'}));
+  assert.throws(()=>apply(g,g.leader,{type:'PROPOSE',team:IDS.slice(0,2)}));
+  assert.throws(()=>apply(g,'ai1',{type:'START'}));
+  const started=apply(g,'human',{type:'START'});
+  assert.equal(started.phase,'PROPOSE');
+  assert.equal(started.version,1);
+  assert.throws(()=>apply(started,'human',{type:'START'}));
 });
 
 test('팀 크기, 비밀 투표, 5회 부결', () => {

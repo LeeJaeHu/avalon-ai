@@ -11,7 +11,7 @@ export function createGame(random = Math.random) {
     const j = Math.floor(random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return { id: crypto.randomUUID(), version: 0, phase: 'PROPOSE', quest: 0, attempt: 1,
+  return { id: crypto.randomUUID(), version: 0, phase: 'ROLE_REVEAL', quest: 0, attempt: 1,
     leader: IDS[Math.floor(random() * 5)], roles: Object.fromEntries(IDS.map((id, i) => [id, shuffled[i]])),
     proposals: [], quests: [], messages: [], team: null, votes: {}, cards: {}, privateCards: [], winner: null,
     pendingSpeech: null, createdAt: new Date().toISOString() };
@@ -45,7 +45,11 @@ export function apply(game, actor, action) {
   requireThat(game.phase !== 'ENDED', '이미 종료된 게임입니다.');
   const next = structuredClone(game);
   const type = action?.type;
-  if (type === 'CHAT') {
+  if (type === 'START') {
+    requireThat(actor === 'human' && next.phase === 'ROLE_REVEAL', '역할 확인 단계가 아닙니다.');
+    next.phase = 'PROPOSE';
+  } else if (type === 'CHAT') {
+    requireThat(next.phase !== 'ROLE_REVEAL', '역할을 확인한 뒤 대화를 시작하세요.');
     const text = String(action.text ?? '').trim();
     requireThat(text.length > 0 && text.length <= 280, '채팅은 1~280자여야 합니다.');
     next.messages.push({ id: `msg-${next.messages.length + 1}`, actor, text, at: new Date().toISOString() });

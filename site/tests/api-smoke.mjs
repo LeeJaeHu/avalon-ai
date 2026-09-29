@@ -16,6 +16,9 @@ async function request(type, extra = {}) {
 }
 await request('NEW');
 assert.ok(game.id && game.role && game.aiPending !== undefined);
+assert.equal(game.phase,'ROLE_REVEAL');
+assert.equal(game.aiPending,false);
+await request('START');
 await request('CHAT', { text: '첫 임무 팀은 어떻게 정할까요?' });
 for (let i=0;i<80 && game.phase!=='ENDED';i++) {
   if (game.aiPending) await request('ADVANCE');
