@@ -1,48 +1,119 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const roleNames: Record<string,string> = { MERLIN:'멀린', LOYAL:'충신', ASSASSIN:'암살자', MINION:'악의 하수인' };
-const phaseNames: Record<string,string> = { ROLE_REVEAL:'역할 확인', PROPOSE:'팀 제안', VOTE:'찬반 투표', QUEST:'임무 카드', ASSASSINATE:'암살', ENDED:'게임 종료' };
+const phaseNames: Record<string,string> = { ROLE_REVEAL:'역할 확인', PROPOSE:'팀 제안', VOTE:'찬반 투표', VOTE_RESULT:'투표 결과', QUEST:'임무 카드', QUEST_RESULT:'원정 결과', ASSASSINATE:'암살', ENDED:'게임 종료' };
+const progressLabels: Record<string,string> = { NEW:'새 게임을 준비하고 있습니다…', START:'게임을 시작하고 있습니다…', CHAT:'메시지를 보내고 있습니다…', PROPOSE:'팀 제안을 저장하고 있습니다…', VOTE:'투표를 저장하고 있습니다…', CARD:'임무 카드를 제출하고 있습니다…', CONTINUE:'다음 단계로 이동하고 있습니다…', ASSASSINATE:'암살 대상을 확인하고 있습니다…', PAUSE:'일시정지 중입니다…', RESUME:'게임을 재개하고 있습니다…', ADVANCE:'AI가 생각하고 있습니다…' };
 
 export default function Home() {
   const [game,setGame] = useState<any>(null);
   const [mode,setMode] = useState('practice');
   const [busy,setBusy] = useState(false);
+  const [aiBusy,setAiBusy] = useState(false);
+  const [queuedVote,setQueuedVote] = useState(false);
+  const [progress,setProgress] = useState('');
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
+  const [notice,setNotice] = useState('');
   const [team,setTeam] = useState<string[]>([]);
   const [message,setMessage] = useState('');
   const [reveal,setReveal] = useState(false);
   const [history,setHistory] = useState(false);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const chatAtBottom = useRef(true);
+  const gameRef = useRef<any>(null);
+  const queueRef = useRef<Record<string,unknown>[]>([]);
+  const processingRef = useRef(false);
+  const aiControllerRef = useRef<AbortController|null>(null);
+  const aiEpochRef = useRef(0);
   const name = (id:string) => game?.names?.[id] ?? id;
-  async function act(input:Record<string,unknown>) {
-    if(busy)return;
-    setBusy(true);setError('');
-    try {
-      const r=await fetch('/api/game',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...input,version:game?.version})});
-      const d:any=await r.json(); if(!r.ok)throw new Error(d.error || '요청 실패');
-      setGame(d.game);setMode(d.aiMode);
-      if(input.type==='CHAT')setMessage('');
-      if(input.type==='PROPOSE')setTeam([]);
-    } catch(e){setError(e instanceof Error?e.message:'요청 실패');}
-    finally{setBusy(false);}
+  function showGame(next:any) {
+    if (!next) return;
+    const current=gameRef.current;
+    if (current?.id===next.id && current.version>next.version) return;
+    gameRef.current=next;
+    setGame(next);
   }
-  useEffect(()=>{fetch('/api/game').then(r=>r.json()).then((d:any)=>{setGame(d.game);setMode(d.aiMode);if(d.error)setError(d.error);}).catch(()=>setError('게임을 불러오지 못했습니다.')).finally(()=>setLoading(false));},[]);
+  async function drainQueue() {
+    if (processingRef.current) return;
+    processingRef.current=true;
+    setBusy(true);
+    while (queueRef.current.length) {
+      const input=queueRef.current[0];
+      setProgress(progressLabels[String(input.type)] ?? '처리 중입니다…');
+      try {
+        for (let attempt=0; attempt<4; attempt++) {
+          const r=await fetch('/api/game',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...input,version:gameRef.current?.version})});
+          const d:any=await r.json();
+          if (r.status===409 && d.game) {
+            showGame(d.game);
+            if (attempt<3) continue;
+          }
+          if (!r.ok) throw new Error(d.error || '요청 실패');
+          showGame(d.game);setMode(d.aiMode);setNotice(d.notice ?? '');
+          if (input.type==='PROPOSE') setTeam([]);
+          break;
+        }
+      } catch(e) {
+        setError(e instanceof Error?e.message:'요청 실패');
+        if (input.type==='CHAT') setMessage(current=>current || String(input.text));
+      } finally {
+        queueRef.current.shift();
+        if (input.type==='VOTE') setQueuedVote(false);
+      }
+    }
+    processingRef.current=false;setBusy(false);setProgress('');
+  }
+  function act(input:Record<string,unknown>) {
+    if(input.type==='NEW')chatAtBottom.current=true;
+    aiEpochRef.current++;
+    aiControllerRef.current?.abort();aiControllerRef.current=null;setAiBusy(false);
+    if(input.type==='VOTE') setQueuedVote(true);
+    if(input.type==='CHAT') setMessage('');
+    queueRef.current.push(input);setError('');
+    void drainQueue();
+  }
+  useEffect(()=>{fetch('/api/game').then(r=>r.json()).then((d:any)=>{showGame(d.game);setMode(d.aiMode);if(d.error)setError(d.error);}).catch(()=>setError('게임을 불러오지 못했습니다.')).finally(()=>setLoading(false));},[]);
   const aiTurn=game?.aiPending;
-  useEffect(()=>{if(!game||busy||error||!aiTurn)return;const t=setTimeout(()=>act({type:'ADVANCE'}),850);return()=>clearTimeout(t);},[game?.version,busy,error,aiTurn]);
+  useEffect(()=>{
+    if(!game||busy||aiBusy||error||(!aiTurn&&!game.idleDueAt))return;
+    const delay=aiTurn?850:Math.max(0,game.idleDueAt-Date.now())+50;
+    const t=setTimeout(async()=>{
+      if(processingRef.current||aiControllerRef.current)return;
+      const controller=new AbortController();aiControllerRef.current=controller;setAiBusy(true);
+      const epoch=aiEpochRef.current;
+      try {
+        const r=await fetch('/api/game',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'ADVANCE',version:gameRef.current?.version}),signal:controller.signal});
+        const d:any=await r.json();
+        if(epoch!==aiEpochRef.current)return;
+        if(r.status===409&&d.game){showGame(d.game);return;}
+        if(!r.ok)throw new Error(d.error||'AI 요청 실패');
+        showGame(d.game);setMode(d.aiMode);setNotice(d.notice??'');
+      } catch(e) {
+        if(!controller.signal.aborted&&epoch===aiEpochRef.current)setError(e instanceof Error?e.message:'AI 요청 실패');
+      } finally {
+        if(aiControllerRef.current===controller){aiControllerRef.current=null;setAiBusy(false);}
+      }
+    },delay);
+    return()=>clearTimeout(t);
+  },[game?.version,busy,aiBusy,error,aiTurn,game?.idleDueAt]);
+  useLayoutEffect(()=>{const el=messagesRef.current;if(el&&chatAtBottom.current)el.scrollTop=el.scrollHeight;},[game?.id,game?.messages?.length]);
   const toggle=(id:string)=>setTeam(v=>v.includes(id)?v.filter(x=>x!==id):v.length<game.size?[...v,id]:v);
-  return <main className="shell"><header className="top"><div className="brand"><span className="sigil">✦</span><div><strong>AVALON</strong><small>다섯 사람의 비밀 원정</small></div></div><button className="outline" disabled={busy} onClick={()=>{if(!game||confirm('현재 게임을 끝내고 새 게임을 시작할까요?')){setReveal(false);act({type:'NEW'});}}}>새 게임</button></header>
-  {loading?<p>불러오는 중…</p>:!game?<section className="card welcome"><div className="crest">✦</div><p className="eyebrow">THE RESISTANCE · AVALON</p><h1>진실은 투표가 끝난 뒤에도<br/>모습을 드러내지 않습니다.</h1><p>당신과 네 명의 AI가 한 판을 플레이합니다. 팀을 고르고, 서로의 말을 듣고, 다섯 번의 임무로 승부를 가르세요.</p><button className="primary" onClick={()=>act({type:'NEW'})}>새 게임 시작 →</button></section>:game.phase==='ROLE_REVEAL'?<section className="card welcome role-intro"><div className="crest">♜</div><p className="eyebrow">YOUR SECRET ROLE</p><h1>당신은 {roleNames[game.role]}입니다</h1><p>{game.known.length?`당신이 아는 사람: ${game.known.map(name).join(', ')}`:'시작 시 알 수 있는 다른 역할 정보가 없습니다.'}</p><p className="role-hint">역할과 시작 정보를 확인하세요. 확인 전에는 원정과 AI 행동이 시작되지 않습니다.</p><button className="primary" disabled={busy} onClick={()=>act({type:'START'})}>확인하고 게임 시작 →</button></section>:<>
+  const voteResult=game?.phase==='VOTE_RESULT'?game.proposals.at(-1):null;
+  const questResult=game?.phase==='QUEST_RESULT'?game.quests.at(-1):null;
+  return <main className="shell"><header className="top"><div className="brand"><span className="sigil">✦</span><div><strong>AVALON</strong><small>다섯 사람의 비밀 원정</small></div></div><div className="top-actions">{game&&<a className="outline" href="/api/game?diagnostics=1" download={`avalon-diagnostics-${game.id}.json`}>진단 로그</a>}<button className="outline" disabled={busy||!game||game.phase==='ENDED'} onClick={()=>act({type:game.paused?'RESUME':'PAUSE'})}>{game?.paused?'계속하기':'일시정지'}</button><button className="outline" disabled={busy} onClick={()=>{if(!game||confirm('현재 게임 기록을 자동 보관하고 새 게임을 시작할까요?')){setReveal(false);act({type:'NEW'});}}}>새 게임</button></div></header>
+  {loading?<p>불러오는 중…</p>:!game?<section className="card welcome"><div className="crest">✦</div><p className="eyebrow">THE RESISTANCE · AVALON</p><h1>진실은 투표가 끝난 뒤에도<br/>모습을 드러내지 않습니다.</h1><p>당신과 네 명의 AI가 한 판을 플레이합니다. 팀을 고르고, 서로의 말을 듣고, 다섯 번의 임무로 승부를 가르세요.</p><button className="primary" disabled={busy} onClick={()=>act({type:'NEW'})}>새 게임 시작 →</button></section>:game.paused?<section className="card welcome pause-screen"><div className="crest">Ⅱ</div><p className="eyebrow">PAUSED</p><h1>게임이 일시정지되었습니다</h1><p>현재 진행 상황은 저장되어 있습니다.</p><button className="primary" disabled={busy} onClick={()=>act({type:'RESUME'})}>계속하기 →</button></section>:game.phase==='ROLE_REVEAL'?<section className="card welcome role-intro"><div className="crest">♜</div><p className="eyebrow">YOUR SECRET ROLE</p><h1>당신은 {roleNames[game.role]}입니다</h1><p>{game.known.length?`당신이 아는 사람: ${game.known.map(name).join(', ')}`:'시작 시 알 수 있는 다른 역할 정보가 없습니다.'}</p><p className="role-hint">역할과 시작 정보를 확인하세요. 확인 전에는 원정과 AI 행동이 시작되지 않습니다.</p><button className="primary" disabled={busy} onClick={()=>act({type:'START'})}>확인하고 게임 시작 →</button></section>:<>
   <div className="status"><div><span className="eyebrow">QUEST {Math.min(game.quest,5)} / 5</span><h1>{phaseNames[game.phase]}</h1><p>리더 <b>{name(game.leader)}</b> · {game.attempt}번째 제안 · 원정팀 {game.size}명</p></div><div className="score"><div>선의 성공<strong>{game.quests.filter((q:any)=>q.result==='SUCCESS').length} / 3</strong></div><div>악의 실패<strong>{game.quests.filter((q:any)=>q.result==='FAIL').length} / 3</strong></div></div></div>
   <div className="layout"><div className="maincol"><section className="card role"><div className="heading"><span className="eyebrow">YOUR ROLE</span><span className="badge">비밀 카드</span></div><div className="roleline"><div className="roleicon">♜</div><div><h2>{reveal?roleNames[game.role]:'역할이 가려져 있습니다'}</h2><p>{reveal?(game.known.length?`당신이 아는 사람: ${game.known.map(name).join(', ')}`:'시작 시 알 수 있는 다른 역할 정보가 없습니다.'):'다른 사람에게 화면을 보여주기 전에 확인하세요.'}</p></div></div><button className="textbutton" onClick={()=>setReveal(!reveal)}>{reveal?'역할 가리기':'내 역할 보기'}</button></section>
-  <section className="card table"><div className="heading"><span className="eyebrow">AT THE ROUND TABLE</span><small>● 진행 중</small></div><div className="players">{game.ids.map((id:string)=><div className={`player ${game.team?.includes(id)?'selected':''} ${id===game.leader&&game.phase!=='ENDED'?'leader':''}`} key={id}><span className="avatar">{id===game.leader&&game.phase!=='ENDED'&&<span className="crown" aria-label="현재 리더">♛</span>}{name(id).slice(0,1)}</span><b>{name(id)}</b><small>{id===game.leader?'팀 선정 리더':id==='human'?'당신':'플레이어'}</small></div>)}</div>
+  <section className="card table"><div className="heading"><span className="eyebrow">AT THE ROUND TABLE</span><small>● 진행 중</small></div><div className="players">{game.ids.map((id:string)=><div className={`player ${game.team?.includes(id)?'selected':''} ${id===game.leader&&game.phase!=='ENDED'?'leader':''}`} key={id}><span className="avatar">{id===game.leader&&game.phase!=='ENDED'&&<span className="crown" aria-label="현재 리더">♛</span>}{name(id).slice(0,1)}</span><b>{name(id)}</b><small>{id===game.leader?'팀 선정 리더':id==='human'?'당신':'플레이어'}</small>{voteResult&&<span className={`player-vote ${voteResult.votes.find((v:any)=>v.actor===id)?.choice==='APPROVE'?'approve':'reject'}`}>{voteResult.votes.find((v:any)=>v.actor===id)?.choice==='APPROVE'?'찬성':'반대'}</span>}</div>)}</div>
   {game.phase==='PROPOSE'&&game.leader==='human'&&<div className="actionbox"><h3>원정팀 {game.size}명을 골라주세요</h3><p>본인을 포함하지 않아도 됩니다. 선택한 팀은 모두에게 공개됩니다.</p><div className="choices">{game.ids.map((id:string)=><button className={team.includes(id)?'chosen':''} key={id} onClick={()=>toggle(id)}>{name(id)} {team.includes(id)?'✓':'+'}</button>)}</div><button className="primary" disabled={busy||team.length!==game.size} onClick={()=>act({type:'PROPOSE',team})}>팀 제안하기 →</button></div>}
   {game.phase==='PROPOSE'&&game.leader!=='human'&&<div className="actionbox"><p className="waiting">{name(game.leader)}님이 원정팀을 선발하고 있습니다.</p></div>}
-  {game.phase==='VOTE'&&<div className="actionbox"><h3>{game.team.map(name).join(' · ')}</h3><p>이 팀으로 임무를 떠날까요? 전원 제출 전까지 표는 비밀입니다.</p>{!game.voted?<div className="choices"><button className="primary" onClick={()=>act({type:'VOTE',choice:'APPROVE'})}>찬성</button><button className="outline" onClick={()=>act({type:'VOTE',choice:'REJECT'})}>반대</button></div>:<p className="waiting">다른 플레이어의 표를 기다리는 중입니다.</p>}</div>}
-  {game.phase==='QUEST'&&<div className="actionbox"><h3>임무가 시작되었습니다</h3><p>참가자: {game.team.map(name).join(' · ')}</p>{game.team.includes('human')&&!game.cardSubmitted?<div className="choices"><button className="primary" onClick={()=>act({type:'CARD',choice:'SUCCESS'})}>성공 카드</button>{['ASSASSIN','MINION'].includes(game.role)&&<button className="outline" onClick={()=>act({type:'CARD',choice:'FAIL'})}>실패 카드</button>}</div>:<p className="waiting">비밀 카드 제출을 기다리는 중입니다.</p>}</div>}
-  {game.phase==='ASSASSINATE'&&<div className="actionbox"><h3>마지막 선택, 멀린 암살</h3><p>암살자가 멀린을 맞히면 악이 승리합니다.</p>{game.role==='ASSASSIN'?<div className="choices">{game.ids.filter((id:string)=>id!=='human').map((id:string)=><button key={id} onClick={()=>act({type:'ASSASSINATE',target:id})}>{name(id)} 지목</button>)}</div>:<p className="waiting">암살자의 선택을 기다립니다.</p>}</div>}
-  {game.phase==='ENDED'&&<div className="outcome"><span className="eyebrow">FINAL RESULT</span><h2>{game.winner==='GOOD'?'선의 승리':'악의 승리'}</h2><p>{game.assassination?`암살 대상: ${name(game.assassination)}`:'임무와 투표 결과로 게임이 끝났습니다.'}</p><div className="revealed">{game.ids.map((id:string)=><span key={id}>{name(id)} · {roleNames[game.roles[id]]}</span>)}</div></div>}</section>
+  {game.phase==='VOTE'&&<div className="actionbox"><h3>{game.team.map(name).join(' · ')}</h3><p>이 팀으로 임무를 떠날까요? 전원이 표를 낸 뒤 개인별 찬반을 함께 공개합니다.</p>{!game.voted?<div className="choices"><button className="primary" disabled={queuedVote} onClick={()=>act({type:'VOTE',choice:'APPROVE'})}>찬성</button><button className="outline" disabled={queuedVote} onClick={()=>act({type:'VOTE',choice:'REJECT'})}>반대</button>{queuedVote&&<p className="waiting" role="status">투표를 접수했습니다. 순서대로 저장 중입니다…</p>}</div>:<p className="waiting">다른 플레이어의 표를 기다리는 중입니다.</p>}</div>}
+  {voteResult&&<div className="actionbox"><h3>원정팀 {voteResult.status==='APPROVED'?'승인':'부결'}</h3><p>찬성 {voteResult.approveCount}명 · 반대 {5-voteResult.approveCount}명. 각 플레이어 아래에서 공개된 표를 확인하세요.</p><button className="primary" disabled={busy} onClick={()=>act({type:'CONTINUE'})}>결과 확인하고 계속 →</button></div>}
+  {game.phase==='QUEST'&&<div className="actionbox"><h3>임무가 시작되었습니다</h3><p>참가자: {game.team.map(name).join(' · ')}</p>{game.team.includes('human')&&!game.cardSubmitted?<div className="choices"><button className="primary" disabled={busy} onClick={()=>act({type:'CARD',choice:'SUCCESS'})}>성공 카드</button>{['ASSASSIN','MINION'].includes(game.role)&&<button className="outline" disabled={busy} onClick={()=>act({type:'CARD',choice:'FAIL'})}>실패 카드</button>}</div>:<p className="waiting">비밀 카드 제출을 기다리는 중입니다.</p>}</div>}
+  {game.phase==='ASSASSINATE'&&<div className="actionbox"><h3>마지막 선택, 멀린 암살</h3><p>암살자가 멀린을 맞히면 악이 승리합니다.</p>{game.role==='ASSASSIN'?<div className="choices">{game.ids.filter((id:string)=>id!=='human').map((id:string)=><button key={id} disabled={busy} onClick={()=>act({type:'ASSASSINATE',target:id})}>{name(id)} 지목</button>)}</div>:<p className="waiting">암살자의 선택을 기다립니다.</p>}</div>}
+  {game.phase==='ENDED'&&<div className="outcome"><span className="eyebrow">FINAL RESULT</span><h2>{game.winner==='GOOD'?'선의 승리':'악의 승리'}</h2><p>{game.assassination?`암살 대상: ${name(game.assassination)}`:'임무와 투표 결과로 게임이 끝났습니다.'}</p><div className="revealed">{game.ids.map((id:string)=><span key={id}>{name(id)} · {roleNames[game.roles[id]]}</span>)}</div><p>새 게임을 시작하기 전에 이 판의 기록을 저장하세요.</p><a className="outline" href="/api/game?export=1" download={`avalon-${game.id}.json`}>게임 기록 JSON 다운로드</a></div>}</section>
   <section className="card history"><button onClick={()=>setHistory(!history)}>원정 기록 <span>{history?'접기 −':'보기 +'}</span></button>{history&&<div className="records">{game.proposals.length===0&&<p>아직 제안이 없습니다.</p>}{game.proposals.map((p:any)=><div className="record" key={p.id}><b>{p.quest}번째 임무 · {p.attempt}번째 제안</b><p>{name(p.leader)} → {p.team.map(name).join(', ')}</p><small>{p.status==='VOTING'?'비밀 투표 중':`${p.status==='APPROVED'?'승인':'부결'} · 찬성 ${p.approveCount}명`}</small>{p.votes&&<p>{p.votes.map((v:any)=>`${name(v.actor)} ${v.choice==='APPROVE'?'찬성':'반대'}`).join(' · ')}</p>}</div>)}{game.quests.map((q:any)=><div className="record" key={q.id}><b>{q.id.replace('quest-','')}번째 임무 {q.result==='SUCCESS'?'성공':'실패'}</b><p>실패 카드 {q.fails}장</p></div>)}</div>}</section></div>
-  <aside className="card chat"><div className="chathead"><div><span className="eyebrow">ROUND TABLE</span><h2>원탁 대화</h2></div><small>● LIVE</small></div><div className="messages">{game.messages.length===0&&<p className="empty">아직 대화가 없습니다.<br/>팀을 논의하거나 누군가에게 질문해 보세요.</p>}{game.messages.map((m:any)=><div className={`bubble ${m.actor==='human'?'mine':''}`} key={m.id}><b>{name(m.actor)}</b><p>{m.text}</p></div>)}</div><form onSubmit={e=>{e.preventDefault();if(message.trim())act({type:'CHAT',text:message.trim()});}}><label htmlFor="msg" className="sr">채팅 메시지</label><input id="msg" maxLength={280} value={message} onChange={e=>setMessage(e.target.value)} placeholder="생각을 나눠보세요…" disabled={busy||game.phase==='ENDED'}/><button disabled={busy||!message.trim()||game.phase==='ENDED'} aria-label="보내기">↑</button></form><small className="chatnote">{mode==='practice'?'연습 AI · 모델 키 미설정':'Gemini AI'} · 채팅은 게임에 저장됩니다</small></aside></div></>}
-  {error&&<div className="error" role="alert">{error} <button onClick={()=>setError('')}>다시 시도</button></div>}<footer>AVALON · 다섯 명의 비밀 원정</footer></main>;
+  <aside className="card chat"><div className="chathead"><div><span className="eyebrow">ROUND TABLE</span><h2>원탁 대화</h2></div><small>● LIVE</small></div><div className="messages" ref={messagesRef} onScroll={e=>{const el=e.currentTarget;chatAtBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<32;}}>{game.messages.length===0&&<p className="empty">아직 대화가 없습니다.<br/>팀을 논의하거나 누군가에게 질문해 보세요.</p>}{game.messages.map((m:any)=><div className={`bubble ${m.actor==='human'?'mine':''}`} key={m.id}><b>{name(m.actor)}</b><p>{m.text}</p></div>)}</div><form onSubmit={e=>{e.preventDefault();if(message.trim())act({type:'CHAT',text:message.trim()});}}><label htmlFor="msg" className="sr">채팅 메시지</label><input id="msg" maxLength={280} value={message} onChange={e=>setMessage(e.target.value)} placeholder="생각을 나눠보세요…" disabled={game.phase==='ENDED'}/><button disabled={!message.trim()||game.phase==='ENDED'} aria-label="보내기">↑</button></form><small className="chatnote">{mode==='practice'?'연습 AI · 모델 키 미설정':'Gemini AI'} · 채팅은 게임에 저장됩니다</small></aside></div>{questResult&&<div className="result-backdrop"><section className="result-dialog card" role="dialog" aria-modal="true" aria-labelledby="quest-result-title"><span className="eyebrow">QUEST {game.quest} RESULT</span><h2 id="quest-result-title">원정 {questResult.result==='SUCCESS'?'성공':'실패'}</h2><p>{questResult.result==='SUCCESS'?'원정팀이 임무를 완수했습니다.':'원정팀에서 실패 카드가 나왔습니다.'}</p><p>실패 카드 {questResult.fails}장</p><button className="primary" autoFocus disabled={busy} onClick={()=>act({type:'CONTINUE'})}>결과 확인하고 계속 →</button></section></div>}</>}
+  {(busy||aiBusy||(aiTurn&&!error))&&<div className="progress" role="status" aria-live="polite"><span className="spinner" aria-hidden="true"/>{busy?progress:aiBusy?'AI가 생각하고 있습니다…':'AI 차례를 준비하고 있습니다…'}</div>}{notice&&<div className="error" role="status">{notice} <button onClick={()=>setNotice('')}>닫기</button></div>}{error&&<div className="error" role="alert">{error} <button onClick={()=>setError('')}>다시 시도</button></div>}<footer>AVALON · 다섯 명의 비밀 원정</footer></main>;
 }

@@ -20,3 +20,17 @@ export const events = sqliteTable('events', {
   detail: text('detail').notNull(),
   at: text('at').notNull(),
 }, table => [uniqueIndex('events_game_version').on(table.gameId, table.version)]);
+
+export const aiFailures = sqliteTable('ai_failures', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  gameId: text('game_id').notNull(),
+  stateVersion: integer('state_version').notNull(),
+  actor: text('actor').notNull(),
+  requestType: text('request_type').notNull(),
+  stage: text('stage').notNull(),
+  errorCode: text('error_code').notNull(),
+  policyVersion: text('policy_version').notNull(),
+  model: text('model').notNull(),
+  latencyMs: integer('latency_ms').notNull(),
+  at: text('at').notNull(),
+});
