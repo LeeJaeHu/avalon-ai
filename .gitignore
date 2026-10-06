@@ -14,3 +14,5 @@ logs/
 .codex-remote-attachments/
 prototype/.env*
 .local-prototype/
+
+/아발론_프롬프트_작성중.txt
