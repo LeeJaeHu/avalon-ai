@@ -39,7 +39,7 @@ try {
   await post('START');
   await post('ADVANCE'); // Scripted opening message.
   const result = await post('ADVANCE');
-  assert.equal(game.phase, 'VOTE');
+  assert.equal(game.phase, 'TEAM_DISCUSSION');
   assert.equal(game.team.length, game.size);
   assert.match(result.notice, /기본 전략/);
   assert.equal(modelCalls, 2);
@@ -67,7 +67,7 @@ try {
   await post('START');
   await post('ADVANCE');
   const retryFailed = await post('ADVANCE');
-  assert.equal(game.phase, 'VOTE');
+  assert.equal(game.phase, 'TEAM_DISCUSSION');
   assert.equal(game.team.length, game.size);
   assert.match(retryFailed.notice, /기본 전략/);
   const failedRetryDiagnostic = await (await fetch(base + '/api/game?diagnostics=1', { headers: { cookie } })).json();

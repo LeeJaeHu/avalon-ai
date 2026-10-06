@@ -19,7 +19,7 @@ test('V2 원문 보존·자리표시자 치환과 V1 보존을 확인한다', ()
   assert.ok(buildPromptV1(input).includes('사람이 당신을 이름으로 지목했습니다'));
 });
 
-test('V2 모의 모델로 세 판을 끝내고 thinking이 상태·화면·후속 입력에 남지 않는다', async () => {
+test('V3 기본 모델을 세 판 종료까지 실행하고 thinking은 행동·공개 화면과 분리한다', async () => {
   const originalFetch = globalThis.fetch;
   const seen = new Set();
   try {
@@ -46,9 +46,11 @@ test('V2 모의 모델로 세 판을 끝내고 thinking이 상태·화면·후�
         const request = nextAiAction(game);
         if (request) {
           const decision = await decide(game, request, 'mock-only-key');
-          assert.ok(!JSON.stringify(decision).includes('PRIVATE_THINKING_MARKER'));
+          assert.equal(decision.thinking,'PRIVATE_THINKING_MARKER');
+          assert.ok(!JSON.stringify(decision.action).includes('PRIVATE_THINKING_MARKER'));
           game = apply(game, decision.actor, decision.action);
         } else if (game.phase === 'PROPOSE') game = apply(game, 'human', { type: 'PROPOSE', team: IDS.slice(0, observe(game).size) });
+        else if (game.phase === 'TEAM_DISCUSSION') game = apply(game, 'human', { type: 'START_VOTE' });
         else if (game.phase === 'VOTE') game = apply(game, 'human', { type: 'VOTE', choice: 'APPROVE' });
         else if (['VOTE_RESULT', 'QUEST_RESULT'].includes(game.phase)) game = apply(game, 'human', { type: 'CONTINUE' });
         else if (game.phase === 'QUEST') game = apply(game, 'human', { type: 'CARD', choice: 'SUCCESS' });

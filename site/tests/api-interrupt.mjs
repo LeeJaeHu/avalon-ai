@@ -27,6 +27,7 @@ assert.equal(game.messages.at(-1).speechAct, 'OTHER');
 await ok('ADVANCE');
 for (let i = 0; i < 8 && game.phase !== 'VOTE'; i++) {
   if (game.aiPending) await ok('ADVANCE');
+  else if (game.phase === 'TEAM_DISCUSSION') await ok('START_VOTE');
   else if (game.phase === 'PROPOSE') await ok('PROPOSE', { team: game.ids.slice(0, game.size) });
   else throw new Error(`투표 단계에 도달하지 못함: ${game.phase}`);
 }

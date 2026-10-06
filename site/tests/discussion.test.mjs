@@ -11,7 +11,7 @@ test('구체적 공개 근거·본인 공개 투표를 제공하고 비밀·타�
     messages: [{id:'m1',actor:'ai3',text:'저는 신중하게 보고 싶어요.'}] };
   const task = discussionTask({actor:'ai3',type:'CHAT',replyMessage:{text:'왜 반대했나요?'}}, state);
   assert.match(task.goal, /직접 답/);
-  assert.deepEqual(task.ownPublicVotes,[{proposalId:'p1',quest:1,team:[{id:'human',name:'나'},{id:'ai1',name:'하린'}],choice:'REJECT'}]);
+  assert.deepEqual(task.ownPublicVotes,[{proposalId:'p1',quest:1,team:[{id:'human',name:'유저'},{id:'ai1',name:'하린'}],choice:'REJECT'}]);
   assert.equal(task.questEvidence[0].fails,1);
   assert.deepEqual(task.recentOwnStatements,[{id:'m1',text:'저는 신중하게 보고 싶어요.'}]);
   assert.ok(!JSON.stringify(task).includes('SECRET'));

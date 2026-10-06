@@ -12,3 +12,5 @@ avalon-*.json
 logs/
 .log-sync/
 .codex-remote-attachments/
+prototype/.env*
+.local-prototype/

@@ -1,0 +1,30 @@
+[
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\avalon-board-mock-v1.html",
+    "Hash": "E7E24E152BF6FC9FB9083FC236982B526C6D52690A66D4B949B75B4CC519A091"
+  },
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\hosted\\app\\globals.css",
+    "Hash": "81D762C48960D81988F3E8E4D94CCFEE79ABAD315CF1594B66518CAD7004A184"
+  },
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\hosted\\app\\page.tsx",
+    "Hash": "C9473531CFCCE22056859A71BD4C82B5D598757CF5D348A7E741F3078B17AE65"
+  },
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\hosted\\lib\\result-popup.mjs",
+    "Hash": "EB52430F7DD5AC7C014C7A9B5D3A7E95490097D96A33D6234A4AEBB13EFEF924"
+  },
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\local\\app\\globals.css",
+    "Hash": "4C23694AEADC527D973E176297AA16FCB7E5F0EF52C7DF7F00E0053839F968A1"
+  },
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\local\\app\\page.tsx",
+    "Hash": "C9473531CFCCE22056859A71BD4C82B5D598757CF5D348A7E741F3078B17AE65"
+  },
+  {
+    "Path": "C:\\Users\\Administrator\\Documents\\basic\\avalon\\backups\\2026-10-06-before-board-ui\\local\\lib\\result-popup.mjs",
+    "Hash": "EB52430F7DD5AC7C014C7A9B5D3A7E95490097D96A33D6234A4AEBB13EFEF924"
+  }
+]

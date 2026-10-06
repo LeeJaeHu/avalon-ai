@@ -32,7 +32,18 @@ assert.equal(game.paused,false);
 await request('CHAT', { text: '첫 임무 팀은 어떻게 정할까요?' });
 for (let i=0;i<180 && game.phase!=='ENDED';i++) {
   if (game.aiPending) await request('ADVANCE');
+  else if (game.roleGuess?.pending) {
+    const premature=await fetch(base+'/api/game',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({type:'CONTINUE',version:game.version})});assert.equal(premature.status,400);
+    const incomplete=await fetch(base+'/api/game',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({type:'ROLE_GUESS',version:game.version,guesses:{}})});assert.equal(incomplete.status,400);
+    const available=['MERLIN','LOYAL','LOYAL','ASSASSIN','MINION'];available.splice(available.indexOf(game.role),1);
+    const beforeVersion=game.version;
+    await request('ROLE_GUESS',{guesses:Object.fromEntries(game.ids.filter(id=>id!=='human').map((id,i)=>[id,available[i]]))});
+    assert.deepEqual(game.roleGuess,{pending:false,submitted:true});
+    const stale=await fetch(base+'/api/game',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({type:'ROLE_GUESS',version:beforeVersion,guesses:{}})});assert.equal(stale.status,409);
+    const reloaded=await (await fetch(base+'/api/game',{headers:{cookie}})).json();assert.deepEqual(reloaded.game.roleGuess,{pending:false,submitted:true});
+  }
   else if (game.phase==='PROPOSE') await request('PROPOSE', { team: game.ids.slice(0,game.size) });
+  else if (game.phase==='TEAM_DISCUSSION') await request('START_VOTE');
   else if (game.phase==='VOTE') await request('VOTE', { choice:'APPROVE' });
   else if (game.phase==='VOTE_RESULT' || game.phase==='QUEST_RESULT') await request('CONTINUE');
   else if (game.phase==='QUEST' && game.team.includes('human')) await request('CARD', { choice:'SUCCESS' });
@@ -53,6 +64,7 @@ assert.equal(savedLog.format, 'avalon-game-log-v1');
 assert.equal(savedLog.game.id, game.id);
 assert.equal(savedLog.game.phase, 'ENDED');
 assert.ok(savedLog.game.roles && Array.isArray(savedLog.game.privateCards));
+if(savedLog.roleGuess){assert.equal(savedLog.roleGuess.total,4);assert.equal(savedLog.roleGuess.correct,Object.entries(savedLog.roleGuess.guesses).filter(([id,role])=>savedLog.game.roles[id]===role).length);assert.ok(savedLog.events.some(event=>event.type==='ROLE_GUESS'));}
 assert.equal(savedLog.events.length, game.version + 1);
 assert.deepEqual(savedLog.events.map(event => event.version), Array.from({length: game.version + 1}, (_, i) => i));
 assert.ok(Array.isArray(savedLog.aiFailures));

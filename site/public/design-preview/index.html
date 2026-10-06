@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Avalon — 원탁 디자인 프리뷰</title>
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="./style.css">
+  <script src="./prototype.js" defer></script>
+</head>
+<body>
+  <div class="preview-bar"><span><i></i> 디자인 프리뷰 <span class="preview-note">· 예시 대화 / 모델 호출 없음</span></span><nav aria-label="시연 장면"><button data-scene="discussion">토론</button><button data-scene="vote">투표</button><button data-scene="result">원정 결과</button><button data-scene="assassination">암살</button><button data-action="reset" class="reset" aria-label="시연 초기화">↺</button></nav></div>
+  <div class="app">
+    <header class="masthead"><a class="brand" href="./index.html"><span class="brand-seal" aria-hidden="true">✧</span><span>AVALON<small>THE ROUND TABLE</small></span></a><div class="motto">다섯 개의 목소리. 하나의 숨겨진 진실.</div><div class="header-actions"><button class="role-button" data-action="role"><span aria-hidden="true">♜</span> 내 비밀 역할</button><a class="original" href="/" target="_blank" rel="noopener">기존 화면 ↗</a></div></header>
+    <section class="overview" aria-label="원정 현황"><div class="chapter"><span id="chapter-label" class="eyebrow"></span><h1 id="scene-title"></h1></div><div class="quest-track" id="quest-track"></div><div class="scoreline" id="scoreline"></div></section>
+    <div class="workspace">
+      <main class="table-panel" aria-label="원탁">
+        <div class="seats" id="seats"></div>
+        <div class="team-strip"><span id="team-label">리더의 팀 초안</span><div id="team-members"></div><button data-action="suggest" id="suggest-button">변경 제안 <span>↗</span></button></div>
+        <div class="conversation-head"><h2><span class="live-dot"></span> 원탁의 대화</h2><span id="conversation-hint">서로의 근거를 묻고, 판단을 나누세요</span><button data-action="records" class="mobile-records">공개 기록 ↗</button></div>
+        <div class="conversation" id="conversation" aria-label="공개 대화"></div>
+        <div class="decision" id="decision" aria-live="polite"></div>
+        <form class="composer" id="chat-form"><div class="reply-context" id="reply-context" hidden></div><div class="input-line"><label for="chat-input" class="sr-only">원탁에 발언하기</label><input id="chat-input" placeholder="누구의 말이 마음에 걸리나요?" maxlength="280" autocomplete="off"><button type="submit" class="send" aria-label="발언 보내기">↑</button></div><div class="composer-note"><span>공개 대화 · 모두에게 들립니다</span><span>Enter로 보내기</span></div></form>
+      </main>
+      <aside class="evidence-panel" id="evidence-panel" aria-label="공개 기록"><div class="evidence-head"><div><span class="eyebrow">SHARED EVIDENCE</span><h2>판단의 단서</h2></div><button data-action="close-records" class="close-records" aria-label="공개 기록 닫기">×</button><span class="evidence-mark" aria-hidden="true">◇</span></div><p class="evidence-intro">모두가 아는 사실. 해석은 당신의 몫입니다.</p><div id="person-evidence" hidden></div><div id="records"></div><div class="evidence-foot"><span aria-hidden="true">⌑</span> 성공한 원정에도 악은 숨어 있을 수 있습니다.</div></aside>
+    </div>
+    <footer class="page-footer"><span>믿음은 제안으로, 의심은 한 표로.</span><span>AVALON / DESIGN STUDY 01</span></footer>
+  </div>
+  <dialog id="role-dialog" class="role-dialog"><button data-action="close-role" class="dialog-close" aria-label="역할 닫기">×</button><span class="eyebrow">FOR YOUR EYES ONLY</span><div class="role-crest">♜</div><p class="role-faction">아서의 충실한 신하 · 선</p><h2>당신은 충신입니다</h2><p>누가 진실을 말하는지, 아직 모릅니다.<br>말과 표, 원정의 흔적으로 동료를 찾으세요.</p><div class="role-goal"><b>당신의 승리 조건</b><span>원정 세 번 성공 + 멀린이 암살을 피하기</span></div><p class="role-small">다른 사람의 정체를 아는 시작 정보는 없습니다.<br>원정에 참여하면 성공 카드만 낼 수 있습니다.</p><button class="gold-button" data-action="close-role">기억하고 원탁으로 돌아가기</button></dialog>
+  <dialog id="team-dialog" class="team-dialog"><button data-action="close-team" class="dialog-close" aria-label="팀 제안 닫기">×</button><span class="eyebrow">A DIFFERENT POSSIBILITY</span><h2>어떤 두 명을 보낼까요?</h2><p>리더 도윤에게 다른 구성을 제안합니다.</p><div id="team-choices"></div><button class="gold-button" id="share-team" data-action="share-team">이 구성을 제안하기</button><small>프리뷰에서는 리더가 제안을 받아들이는 예시를 보여줍니다.</small></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

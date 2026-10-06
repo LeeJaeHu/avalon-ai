@@ -1,0 +1,50 @@
+{
+  "passed": true,
+  "synthetic": true,
+  "modelCalls": 0,
+  "layouts": [
+    {
+      "width": 1366,
+      "height": 768,
+      "x": 403,
+      "right": 963,
+      "y": 52.2109375,
+      "bottom": 715.7890625,
+      "scrollHeight": 662,
+      "clientHeight": 662,
+      "documentWidth": 1366
+    },
+    {
+      "width": 390,
+      "height": 668,
+      "x": 14,
+      "right": 376,
+      "y": 10,
+      "bottom": 658,
+      "scrollHeight": 648,
+      "clientHeight": 646,
+      "documentWidth": 390
+    },
+    {
+      "width": 390,
+      "height": 668,
+      "x": 14,
+      "right": 376,
+      "y": 10,
+      "bottom": 658,
+      "scrollHeight": 648,
+      "clientHeight": 646,
+      "documentWidth": 390
+    }
+  ],
+  "calls": [
+    "ROLE_GUESS",
+    "ROLE_GUESS",
+    "CONTINUE",
+    "ROLE_GUESS",
+    "CONTINUE",
+    "ROLE_GUESS",
+    "CONTINUE"
+  ],
+  "pageErrors": []
+}

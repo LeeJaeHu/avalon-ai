@@ -13,6 +13,7 @@ await post('NEW'); await post('START'); await post('ADVANCE');
 for (let step = 0; step < 160 && game.phase !== 'ENDED'; step++) {
   if (game.aiPending) await post('ADVANCE');
   else if (game.phase === 'PROPOSE') await post('PROPOSE', { team: game.ids.slice(0, game.size) });
+  else if (game.phase === 'TEAM_DISCUSSION') await post('START_VOTE');
   else if (game.phase === 'VOTE') await post('VOTE', { choice: 'APPROVE' });
   else if (['VOTE_RESULT', 'QUEST_RESULT'].includes(game.phase)) await post('CONTINUE');
   else if (game.phase === 'QUEST') await post('CARD', { choice: 'SUCCESS' });

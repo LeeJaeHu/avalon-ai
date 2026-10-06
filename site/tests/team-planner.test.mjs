@@ -51,7 +51,7 @@ test('A/B 배정은 판에 고정되고 B의 충신 리더만 계산기로 제�
   const chosen = await decide(game, { actor: 'ai1', type: 'PROPOSE' }, 'configured-key');
   assert.equal(chosen.mode, 'planner');
   assert.deepEqual(chosen.action.team, planTeam(observe(game, 'ai1'), 'ai1').team);
-  assert.equal(apply(game, 'ai1', chosen.action).phase, 'VOTE');
+  assert.equal(apply(game, 'ai1', chosen.action).phase, 'TEAM_DISCUSSION');
   game.aiConfig.proposalPolicy = 'A';
   assert.equal((await decide(game, { actor: 'ai1', type: 'PROPOSE' }, '')).mode, 'practice');
   game.aiConfig.proposalPolicy = 'B';

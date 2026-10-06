@@ -5,7 +5,7 @@ import { nextAiAction } from '../lib/ai.mjs';
 
 function seeded() { let i = 0; return () => [0.1,0.7,0.3,0.8,0.2][i++ % 5]; }
 function fresh() { return apply(createGame(seeded()),'human',{type:'START'}); }
-function voteAll(g, choices) { for (let i=0;i<5;i++) g=apply(g,IDS[i],{type:'VOTE',choice:choices[i]}); return g; }
+function voteAll(g, choices) { if(g.phase==='TEAM_DISCUSSION')g=apply(g,'human',{type:'START_VOTE'}); for (let i=0;i<5;i++) g=apply(g,IDS[i],{type:'VOTE',choice:choices[i]}); return g; }
 
 test('역할 배정과 관찰 정보 경계', () => {
   const g=fresh();
@@ -73,6 +73,7 @@ test('팀 크기, 비밀 투표, 5회 부결', () => {
   assert.throws(()=>apply(g,g.leader,{type:'PROPOSE',team:IDS.slice(0,3)}));
   for(let attempt=1;attempt<=5;attempt++){
     g=apply(g,g.leader,{type:'PROPOSE',team:IDS.slice(0,SIZES[0])});
+    g=apply(g,'human',{type:'START_VOTE'});
     g=apply(g,IDS[0],{type:'VOTE',choice:'REJECT'});
     assert.equal('votes' in observe(g).proposals.at(-1),false);
     g=voteRest(g,['REJECT','REJECT','APPROVE','APPROVE']);

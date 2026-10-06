@@ -1,5 +1,15 @@
 # 게임 기록과 운영 관측
 
+## JEV 발언 판단 비교 기록
+
+2026-10-03 로컬 소스에 baseline/shadow/jev 라우팅을 추가했다. 운영 배포는 아직 하지 않았다. 공개 관찰값으로만 다음 응답 후보/대기와 발언 태그를 추정하며 플레이어 전략은 기존 모델이 정한다. 질문 버전 `jev-discussion-v1`, 모델 `jev-1.13.0`을 기록한다.
+
+로컬 `routingAttempts`에는 gameId/stateVersion/메시지 ID/입력 해시/기존·JEV·적용 선택/확신도·확률/사용량·지연/상태·게시 결과를 저장한다. trace는 같은 시도 ID와 상태 버전으로 판단→생성→게시 또는 폐기를 연결한다. log는 NO_KEY/FALLBACK/DISCARDED/GENERATION_FAILURE 등을 구분한다. metric은 `summarizeRouting`과 `scripts/compare-routing.mjs`로 호출·불일치·대체·생략한 생성·알려진 비용·사용량 미확인 호출·지연 p50/p95를 계산한다. 입력 원문/키/오류 원문/비밀 관찰은 이 기록에 복사하지 않는다. 종료 전 API에서 개별 비교 판단을 공개하지 않는다.
+
+Sites 서버 연결은 `TYPESAFE_API_KEY`와 `AVALON_ROUTING_MODE` 환경 설정을 사용한다. 새 판부터 설정을 고정하고 기존 판은 baseline을 유지한다. 성공/생성 실패 판단은 사건 detail.routing으로 저장한다. 폐기된 요청은 DB 사건에 저장하지 않고 서버의 discussion_routing 로그에서 REQUESTED→DISCARDED로 구분한다. 서버 로그 수집·보관 인프라는 이번에 추가하지 않았다. 따라서 Sites 종료 로그만으로는 폐기된 호출 비용을 완전히 집계할 수 없다. 요청 동시 실행은 기존 상태 버전 저장 검사로 중복 게시를 막지만 Sites의 모델 호출 자체를 한 번으로 합치는 기능은 이번에 추가하지 않았다. 로컬 서버는 기존 단일 inFlight 잠금을 유지한다.
+
+비용은 확인된 input_tokens×$0.042/백만 토큰이다. Gemini/호스팅 비용을 포함하지 않는다. 불일치는 개선율이 아니며, 모의 응답 검사 통과는 실제 JEV의 한국어 정확도·대화 품질·운영 성과를 증명하지 않는다. 구현·비교 한계는 `docs/specs/016-jev-discussion-routing.md`를 참조한다.
+
 ## 실제 저장 구조
 
 게임은 Sites D1의 `games` 테이블에 상태 JSON으로 저장된다. 게임 ID는 브라우저의 HttpOnly 쿠키에 보관한다. 채팅 원문은 대화 재표시와 AI 문맥을 위해 게임 상태에 포함된다. 역할, 비밀 투표, 임무 카드는 서버 상태에만 있으며 `observe()`가 본인에게 허용된 정보만 응답한다.
@@ -53,4 +63,16 @@ FROM events WHERE events.type = 'CHAT' ORDER BY events.at DESC LIMIT 20;
 
 ## 개인정보와 운영 한계
 
+2026-10-06 새 판은 `usageTrackingVersion=1`을 고정한다. `model_usage`는 Gemini/JEV의 각 전송을 UUID로 기록하고 REQUESTED에서 최종 상태로 갱신한다. 재시도·잘못된 응답·게시 전 폐기에도 사용량을 보존한다. Gemini 입력/응답/추론/캐시/전체 토큰과 가격 버전을 남기며 프롬프트·응답 원문·인증 정보는 이 테이블에 저장하지 않는다. 화면의 `usageSummary`는 공급자별 호출·토큰·추정 비용·미확인 호출을 집계하고, 종료 또는 보관 판 JSON에는 `modelUsage`와 같은 합계를 포함한다. 이전 판의 누락 기록은 `legacyIncomplete`로 표시한다. 비용은 고정 Global 일반 단가의 USD 추정이며 중계·호스팅·실제 청구 조건을 포함하지 않는다.
+
+같은 판의 모델 호출은 `ai_locks`의 180초 임대로 제한하며 소유자만 해제한다. 사람 입력으로 버전이 바뀌면 이미 생성된 답변은 게시하지 않는다. 사용량 시도는 남고 폐기 사건은 기존 서버 trace와 연결된다. JEV 진행 판단에는 `progress`/`progressVersion`을 남긴다. 자동 검사는 `site/tests/usage.test.mjs`, `site/tests/conversation.test.mjs`; 실제 짧은 연결 확인은 `site/tests/live-routing-smoke.mjs`이며 전체 게임 품질 평가와 구분한다.
+
+2026-10-04부터 운영판 새 게임은 `aiConfig.routingMode`로 기존/JEV 방식을 고정한다. `GAME_CREATED` 사건과 종료 로그에 모드를 남기고 AI 토론 사건의 `detail.routing`에 시도 ID·입력 해시·기존/JEV/적용 발언자·판별 버전·상태·확률·입력 토큰·지연·추정 비용을 기록한다. 대국 중 진단 파일에는 모드/판별 버전만 추가하며 상세 판단은 종료 로그에서 확인한다. JEV 요청/게시/생성 실패/폐기 단계는 서버 구조화 로그의 같은 시도 ID로 연결한다. 폐기된 요청은 서버 로그에만 있어 종료 JSON 집계에서는 빠진다. `scripts/compare-routing.mjs`는 종료 JSON의 사건 기록도 집계하며 선택 차이를 품질 개선으로 해석하지 않는다. 실제 연결 smoke의 수치와 판 ID는 `specs/016-jev-discussion-routing.md`에 있다.
+
 새 사이트는 소유자 전용 비공개 접근이다. GitHub 저장소에도 실제 게임 데이터는 올리지 않는다. 개인 이름이나 민감한 내용을 채팅에 입력하지 않는 것이 좋다. 현재 자동 보관 기한·삭제 UI·동의 화면·외부 분석 도구는 없다. 다른 이용자에게 사이트를 공유하기 전에 사용자 식별·삭제 요청·보관 기한을 구현해야 한다. 원문을 포트폴리오 사례에 옮길 때는 이용 권한과 개인정보를 별도로 확인한다.
+
+## JEV 개인 행동과 역할 식별 결과 (2026-10-06)
+
+행동 선택의 trace는 gameId/stateVersion/actor/requestType → `selection.id`/inputHash → JEV 선택 또는 오류 → 서버 검증/버전 재확인 → 상태 적용으로 연결한다. 개인 행동 사건의 `detail.selection`은 선택 ID·후보 수·분포·확신도·모델·판별 버전·사용량·지연·대체 여부를 기록한다. JEV 전송도 기존 model_usage UUID의 REQUESTED/최종 상태를 갱신하므로 폐기/실패 사용량을 포함한다. 선의 성공 제출은 RULE이며 모델 호출로 세지 않는다. JEV는 thinking 문장을 생성하지 않는다. Gemini 대화의 명시적 thinking 자기보고와 본인의 직전 생각 기억은 유지하고 실제 선택은 별도 privateActions에 보존한다.
+
+`ROLE_GUESS` 사건과 종료 로그의 roleGuess에 AI4명의 추측·개별 정오·correct/total·원정 수·사용자 역할/시작 지식·시작 aiConfig를 저장한다. 점수와 정체는 ENDED 전의 일반 응답·진단·AI 입력에서 제외한다. 기존 D1 games.state/events.detail에 저장하며 별도 테이블이나 마이그레이션은 없다. 5연속 부결·중도 재시작은 추측 미실시로 구분한다. 정답률은 사용자 경험과 시작 정보·악의 기만에도 좌우되며 승률·전략 품질과 구분해 조건별로 비교한다. 관련 반복 검사는 `site/tests/action-selection.test.mjs`, `site/tests/role-guess.test.mjs`, `site/tests/api-smoke.mjs`, `site/tests/ui-role-guess.mjs`다. 실제 모델 품질 비교는 미실시다.
