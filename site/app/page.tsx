@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {COMPARISON_MODES,comparisonMode,comparisonPreset} from '../lib/comparison.mjs';
 import {manualNextStep} from '../lib/conversation.mjs';
 import {resultPopup,questHistoryPopup} from '../lib/result-popup.mjs';
 import {ROLE_GUIDES,roleGuide,privateRoleKnowledge,roleInteractions} from '../lib/role-guide.mjs';
@@ -21,6 +22,7 @@ function RoleDetails({guide,knowledge}:{guide:any,knowledge?:string}) {
 export default function Home() {
   const [game,setGame] = useState<any>(null);
   const [mode,setMode] = useState('practice');
+  const [nextComparison,setNextComparison] = useState('gemini');
   const [nextRouting,setNextRouting] = useState('baseline');
   const [nextAction,setNextAction] = useState('gemini');
   const [routingReady,setRoutingReady] = useState(false);
@@ -88,7 +90,7 @@ export default function Home() {
     processingRef.current=false;setBusy(false);setProgress('');
   }
   function act(input:Record<string,unknown>) {
-    if(input.type==='NEW'){setRolePanel(null);setMessage('');setGuesses({});setGuessOpen(false);input={...input,routingMode:nextRouting,actionMode:nextAction};chatAtBottom.current=true;setReplyTo(null);}
+    if(input.type==='NEW'){setRolePanel(null);setMessage('');setGuesses({});setGuessOpen(false);input={...input,routingMode:nextRouting,actionMode:nextAction,...(nextComparison==='custom'?{}:{comparisonMode:nextComparison})};chatAtBottom.current=true;setReplyTo(null);}
     aiEpochRef.current++;
     // Let the server finish its ledger and release the lease; epochs discard stale UI replies.
     aiControllerRef.current=null;setAiBusy(false);
@@ -97,7 +99,7 @@ export default function Home() {
     queueRef.current.push(input);setError('');
     void drainQueue();
   }
-  useEffect(()=>{fetch('/api/game').then(r=>r.json()).then((d:any)=>{showGame(d.game);setMode(d.aiMode);setRoutingReady(!!d.routingReady);setNextRouting(d.routingReady?'jev':'baseline');setNextAction(d.routingReady?'jev':'gemini');if(d.error)setError(d.error);}).catch(()=>setError('게임을 불러오지 못했습니다.')).finally(()=>setLoading(false));},[]);
+  useEffect(()=>{fetch('/api/game').then(r=>r.json()).then((d:any)=>{showGame(d.game);setMode(d.aiMode);setRoutingReady(!!d.routingReady);setNextComparison(d.routingReady?'hybrid':'gemini');setNextRouting(d.routingReady?'jev':'baseline');setNextAction(d.routingReady?'jev':'gemini');if(d.error)setError(d.error);}).catch(()=>setError('게임을 불러오지 못했습니다.')).finally(()=>setLoading(false));},[]);
   const popupCandidate=resultPopup(game);
   const roleIntro=game?.phase==='ROLE_REVEAL';
   const mine=game?roleGuide(game.role,game.roleCounts):null;
@@ -190,7 +192,7 @@ export default function Home() {
   return <main className={`shell ${playing?'in-game':''}`}>
     <header className="top"><div className="brand"><span className="sigil">♜</span><div><strong>AVALON</strong></div></div><div className="top-actions"><button className="outline" disabled={busy||!game||game.phase==='ENDED'} onClick={()=>act({type:game.paused?'RESUME':'PAUSE'})}>{game?.paused?'계속하기':'일시정지'}</button><button className="outline" disabled={busy} onClick={()=>{if(!game||confirm('현재 게임 기록을 자동 보관하고 새 게임을 시작할까요?')){act({type:'NEW'});}}}>새 게임</button>
       <details className="game-settings"><summary>설정</summary><div className="settings-content">
-        {!loading&&<section className="routing-picker" aria-label="새 게임의 AI 방식"><label htmlFor="routing-mode">발언자 선택</label><select id="routing-mode" value={nextRouting} disabled={busy} onChange={e=>setNextRouting(e.target.value)}><option value="baseline">기존 규칙</option><option value="jev" disabled={!routingReady}>JEV 진행자</option></select><label htmlFor="action-mode">행동 선택</label><select id="action-mode" value={nextAction} disabled={busy} onChange={e=>setNextAction(e.target.value)}><option value="gemini">Gemini · 기존 방식</option><option value="jev" disabled={!routingReady}>JEV · 직접 선택</option></select><p>대화는 Gemini가 맡습니다. 다음 새 게임에 적용됩니다.{!routingReady&&' JEV 연결 준비 중입니다.'}</p></section>}
+        {!loading&&<section className="routing-picker" aria-label="새 게임의 AI 방식"><label htmlFor="comparison-mode">AI 비교 모드</label><select id="comparison-mode" value={nextComparison} disabled={busy} onChange={e=>{const selected=e.target.value;setNextComparison(selected);if(selected!=='custom'){const preset=comparisonPreset(selected);setNextRouting(preset.routingMode);setNextAction(preset.actionMode);}}}><option value="gemini">Gemini 단독</option><option value="hybrid" disabled={!routingReady}>JEV + Gemini</option><option value="custom">사용자 설정</option></select>{nextComparison==='custom'&&<><label htmlFor="routing-mode">발언자 선택</label><select id="routing-mode" value={nextRouting} disabled={busy} onChange={e=>setNextRouting(e.target.value)}><option value="baseline">기존 규칙</option><option value="jev" disabled={!routingReady}>JEV 진행자</option></select><label htmlFor="action-mode">행동 선택</label><select id="action-mode" value={nextAction} disabled={busy} onChange={e=>setNextAction(e.target.value)}><option value="gemini">Gemini</option><option value="jev" disabled={!routingReady}>JEV</option></select></>}<p>{nextComparison==='gemini'?'대화·행동: Gemini · 발언자: 기존 규칙':nextComparison==='hybrid'?'대화: Gemini · 발언자·행동: JEV':'발언자와 행동 선택을 각각 지정합니다.'} 다음 새 게임에 적용됩니다.{!routingReady&&' JEV 연결 준비 중입니다.'}</p>{game&&<p>현재 판: {mode==='practice'?'연습 AI':COMPARISON_MODES[comparisonMode(game) as keyof typeof COMPARISON_MODES]?.label??'사용자 설정'}</p>}<small>종료 후 게임 로그를 내려받으면 모드별 비용·호출·역할 추측 결과를 비교할 수 있습니다.</small></section>}
         {game?.usage&&<details className="usage-panel"><summary>이번 판 추정 비용 · {'$'+game.usage.costUsd.toFixed(6)}</summary><p>실제 API 응답 사용량 기준 · USD</p><table><thead><tr><th>모델</th><th>호출</th><th>입력</th><th>응답 / 추론</th><th>비용</th></tr></thead><tbody>{['gemini','jev'].map(provider=>{const u=game.usage.providers[provider];return <tr key={provider}><td>{provider==='gemini'?'Gemini':'JEV'}</td><td>{u.calls}</td><td>{u.input.toLocaleString()}</td><td>{u.output.toLocaleString()} / {u.thoughts.toLocaleString()}</td><td>{'$'+u.costUsd.toFixed(6)}</td></tr>;})}</tbody></table><small>일반 Global 단가 추정입니다. 재시도·폐기된 응답 포함, 중계·호스팅 비용 제외. 실제 청구액과 다를 수 있습니다.{game.usage.unknownCalls>0&&` 사용량 미확인 ${game.usage.unknownCalls}회는 미반영.`}{game.usage.legacyIncomplete&&' 기록 시작 전 사용량은 미포함.'}</small></details>}
         {game&&<a className="textbutton" href="/api/game?diagnostics=1" download={`avalon-diagnostics-${game.id}.json`}>진단 로그 다운로드</a>}
       </div></details>
@@ -210,7 +212,7 @@ export default function Home() {
         </aside>
         <section className="conversation" aria-label="채팅 내역"><div className="chathead"><h2>채팅 내역</h2><small role="status">{aiBusy?'발언 준비 중…':aiTurn?'다음 발언 대기…':game.phase==='ENDED'?'대화 종료':'질문 · 반론 · 설득'}</small></div>
           <div className="messages" ref={messagesRef} onScroll={e=>{const el=e.currentTarget;chatAtBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<32;}}>{timeline.length===0&&<p className="empty">어떤 팀으로 시작할까요?<br/>참가자에게 이유를 물어보세요.</p>}{timeline.map((item:any)=>item.kind==='MESSAGE'?<div className={`bubble ${item.actor==='human'?'mine':''}`} key={item.id}><div className="bubble-heading"><b>{name(item.actor)}</b>{game.phase!=='ENDED'&&<button className="reply-button" onClick={()=>{setReplyTo(item.id);document.getElementById('msg')?.focus();}} aria-label={`${name(item.actor)}의 ${item.id} 발언에 답하기`}>답하기 ↩</button>}</div>{item.replyTo&&<div className="quoted">↳ {name(game.messages.find((m:any)=>m.id===item.replyTo)?.actor)}: {game.messages.find((m:any)=>m.id===item.replyTo)?.text}</div>}<p>{item.text}</p></div>:item.kind==='DISCUSSION'&&item.text.startsWith('진행자: ')?<div className="bubble moderator" key={item.id}><div className="bubble-heading"><b>진행자</b></div><p>{item.text.slice(5)}</p></div>:<div className={`table-event ${item.kind.toLowerCase()}`} key={item.id}><span className="event-mark">{item.kind==='QUEST_RESULT'?'◆':item.kind==='VOTE_RESULT'?'✓':'◇'}</span><p>{item.text}</p></div>)}</div>
-          <div className="composer">{replying&&<div className="reply-context"><span>{name(replying.actor)}에게 답하기 · {replying.text}</span><button className="textbutton" onClick={()=>setReplyTo(null)} aria-label="답하기 취소">×</button></div>}<form onSubmit={e=>{e.preventDefault();if(message.trim())act({type:'CHAT',text:message.trim(),replyTo});}}><label htmlFor="msg" className="sr">채팅 메시지</label><input id="msg" maxLength={280} value={message} onChange={e=>setMessage(e.target.value)} placeholder={replying?`${name(replying.actor)}에게 질문하거나 답하세요…`:'의견이나 의심의 근거를 남기세요…'} disabled={(game.paused&&game.pauseSource!=='reading')||game.phase==='ENDED'}/><button disabled={(game.paused&&game.pauseSource!=='reading')||!message.trim()||game.phase==='ENDED'} aria-label="보내기">↑</button></form><small className="chatnote">{mode==='practice'?'연습 AI':'Gemini AI'} · {game.routingMode==='jev'?'JEV 적용':'기존 방식'} · 대화와 공개 기록이 저장됩니다</small></div>
+          <div className="composer">{replying&&<div className="reply-context"><span>{name(replying.actor)}에게 답하기 · {replying.text}</span><button className="textbutton" onClick={()=>setReplyTo(null)} aria-label="답하기 취소">×</button></div>}<form onSubmit={e=>{e.preventDefault();if(message.trim())act({type:'CHAT',text:message.trim(),replyTo});}}><label htmlFor="msg" className="sr">채팅 메시지</label><input id="msg" maxLength={280} value={message} onChange={e=>setMessage(e.target.value)} placeholder={replying?`${name(replying.actor)}에게 질문하거나 답하세요…`:'의견이나 의심의 근거를 남기세요…'} disabled={(game.paused&&game.pauseSource!=='reading')||game.phase==='ENDED'}/><button disabled={(game.paused&&game.pauseSource!=='reading')||!message.trim()||game.phase==='ENDED'} aria-label="보내기">↑</button></form><small className="chatnote">{mode==='practice'?'연습 AI':COMPARISON_MODES[comparisonMode(game) as keyof typeof COMPARISON_MODES]?.label??'사용자 설정'} · 대화와 공개 기록이 저장됩니다</small></div>
         </section>
       </section>
     </>}

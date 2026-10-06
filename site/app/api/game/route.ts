@@ -1,3 +1,4 @@
+import {COMPARISON_VERSION,comparisonPreset,comparisonMode} from '../../../lib/comparison.mjs';
 import { env } from 'cloudflare:workers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createGame, observe, apply } from '../../../lib/game.mjs';
@@ -27,7 +28,7 @@ function json(value: unknown, status = 200) {
 async function view(game: any) {
   const playerView = observe(game);
   const usage=await gameUsage(env.DB!,game);
-  return { ...playerView,usage:usage.summary, aiPending: !!nextAiAction(game), idleDueAt: idleDueAt(game), routingMode: game.aiConfig?.routingMode ?? 'baseline', actionMode: game.aiConfig?.actionMode ?? 'gemini' };
+  return { ...playerView,comparisonMode:comparisonMode(game.aiConfig),usage:usage.summary, aiPending: !!nextAiAction(game), idleDueAt: idleDueAt(game), routingMode: game.aiConfig?.routingMode ?? 'baseline', actionMode: game.aiConfig?.actionMode ?? 'gemini' };
 }
 
 async function readGame(request: NextRequest) {
@@ -118,8 +119,9 @@ export async function POST(request: NextRequest) {
     if (origin && origin !== new URL(request.url).origin) return json({ error: '요청 출처가 맞지 않습니다.' }, 403);
     const body: any = await request.json();
     if (body.type === 'NEW') {
-      const routingMode = newGameRoutingMode(body.routingMode, defaultRoutingMode());
-      const actionMode = body.actionMode ?? (routingMode === 'jev' ? 'jev' : 'gemini');
+      const preset = body.comparisonMode === undefined ? null : comparisonPreset(body.comparisonMode);
+      const routingMode = newGameRoutingMode(preset?.routingMode ?? body.routingMode, defaultRoutingMode());
+      const actionMode = preset?.actionMode ?? body.actionMode ?? (routingMode === 'jev' ? 'jev' : 'gemini');
       if (!['gemini','jev'].includes(actionMode)) return json({ error: '행동 선택 방식을 확인해 주세요.' }, 400);
       if (routingMode !== 'baseline' && !routingReady()) return json({ error: 'JEV와 대화 AI 연결 설정을 확인해 주세요. 기존 방식으로 시작할 수 있습니다.' }, 503);
       if (actionMode === 'jev' && !routingReady()) return json({ error: 'JEV 연결 설정을 확인해 주세요.' }, 503);
@@ -131,6 +133,7 @@ export async function POST(request: NextRequest) {
         await save(previous, archived, 'human', 'GAME_RESTARTED');
       }
       const game = { ...createGame(), aiConfig: { policyVersion: AI_POLICY_VERSION, promptVersion: PROMPT_VERSION,
+        comparisonVersion:COMPARISON_VERSION, comparisonMode:comparisonMode({routingMode,actionMode}),
         routingMode, routingVersion: ROUTING_VERSION, routingModel: JEV_MODEL,
         actionMode, actionSelectionVersion: actionMode === 'jev' ? ACTION_SELECTION_VERSION : null, actionModel: actionMode === 'jev' ? JEV_MODEL : AI_MODEL, roleGuessVersion: ROLE_GUESS_VERSION,
         conversationVersion:1,manualProgress:true,usageTrackingVersion:1,

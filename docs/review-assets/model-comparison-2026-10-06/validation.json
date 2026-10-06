@@ -1,0 +1,22 @@
+{
+  "checks": [
+    {
+      "width": 1366,
+      "selected": "gemini"
+    },
+    {
+      "width": 1366,
+      "selected": "hybrid"
+    },
+    {
+      "width": 390,
+      "selected": "gemini"
+    },
+    {
+      "width": 390,
+      "selected": "hybrid"
+    }
+  ],
+  "errors": [],
+  "modelCalls": 0
+}
