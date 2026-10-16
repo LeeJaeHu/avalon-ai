@@ -1,0 +1,145 @@
+{
+  "method": "offline reconstruction and mocked provider; not an original request dump or model evaluation",
+  "cases": [
+    {
+      "version": 33,
+      "actor": "ai2",
+      "type": "CARD",
+      "role": "ASSASSIN",
+      "known": [
+        "ai3"
+      ],
+      "humanName": "나",
+      "quest": 2,
+      "successes": 1,
+      "team": [
+        "human",
+        "ai1",
+        "ai2"
+      ],
+      "currentTeamEvilShares": {
+        "0": 0,
+        "1": 1,
+        "2": 0
+      },
+      "evilProbability": {
+        "human": 0,
+        "ai1": 0,
+        "ai2": 1,
+        "ai3": 1,
+        "ai4": 0
+      },
+      "messageCount": 5,
+      "previousThinkingPresent": true,
+      "example": "SUCCESS",
+      "actual": "SUCCESS",
+      "exampleMatchesActual": true,
+      "alternativeAllowedBySchema": true,
+      "alternativeReturnedUnchanged": true
+    },
+    {
+      "version": 37,
+      "actor": "ai2",
+      "type": "PROPOSE",
+      "role": "ASSASSIN",
+      "known": [
+        "ai3"
+      ],
+      "humanName": "나",
+      "quest": 3,
+      "successes": 2,
+      "team": null,
+      "currentTeamEvilShares": null,
+      "evilProbability": {
+        "human": 0,
+        "ai1": 0,
+        "ai2": 1,
+        "ai3": 1,
+        "ai4": 0
+      },
+      "messageCount": 6,
+      "previousThinkingPresent": true,
+      "example": [
+        "human",
+        "ai1"
+      ],
+      "actual": [
+        "human",
+        "ai1"
+      ],
+      "exampleMatchesActual": true,
+      "alternativeAllowedBySchema": true,
+      "alternativeReturnedUnchanged": true
+    },
+    {
+      "version": 46,
+      "actor": "ai3",
+      "type": "VOTE",
+      "role": "MINION",
+      "known": [
+        "ai2"
+      ],
+      "humanName": "나",
+      "quest": 3,
+      "successes": 2,
+      "team": [
+        "human",
+        "ai1"
+      ],
+      "currentTeamEvilShares": {
+        "0": 1,
+        "1": 0,
+        "2": 0
+      },
+      "evilProbability": {
+        "human": 0,
+        "ai1": 0,
+        "ai2": 1,
+        "ai3": 1,
+        "ai4": 0
+      },
+      "messageCount": 9,
+      "previousThinkingPresent": true,
+      "example": "APPROVE",
+      "actual": "APPROVE",
+      "exampleMatchesActual": true,
+      "alternativeAllowedBySchema": true,
+      "alternativeReturnedUnchanged": true
+    },
+    {
+      "version": 54,
+      "actor": "ai2",
+      "type": "ASSASSINATE",
+      "role": "ASSASSIN",
+      "known": [
+        "ai3"
+      ],
+      "humanName": "나",
+      "quest": 3,
+      "successes": 3,
+      "team": [
+        "human",
+        "ai1"
+      ],
+      "currentTeamEvilShares": {
+        "0": 1,
+        "1": 0,
+        "2": 0
+      },
+      "evilProbability": {
+        "human": 0,
+        "ai1": 0,
+        "ai2": 1,
+        "ai3": 1,
+        "ai4": 0
+      },
+      "messageCount": 9,
+      "previousThinkingPresent": true,
+      "example": "human",
+      "actual": "human",
+      "exampleMatchesActual": true,
+      "alternativeAllowedBySchema": true,
+      "alternativeReturnedUnchanged": true
+    }
+  ]
+}

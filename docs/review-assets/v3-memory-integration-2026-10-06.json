@@ -1,0 +1,10 @@
+{
+  "environment": "local-worker-synthetic-model",
+  "realModelCalls": 0,
+  "acceptedThinkingEvents": 2,
+  "thinkingUsageRecords": 2,
+  "ownThinkingReused": true,
+  "publicApiThinkingAbsent": true,
+  "endedDiagnosticThinkingVisible": true,
+  "promptVersion": "V3-thinking-memory-v1"
+}

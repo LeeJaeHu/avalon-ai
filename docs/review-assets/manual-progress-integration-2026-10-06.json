@@ -1,0 +1,13 @@
+{
+  "legacyReadingPauseCleared": true,
+  "legacyCountdownIgnored": true,
+  "idleDoesNotAdvance": true,
+  "pendingReplyBlocksMove": true,
+  "concurrentMoveAccepted": 1,
+  "concurrentMoveRejected": 1,
+  "voteChoiceBlocksMove": true,
+  "resultDiscussionCompleted": true,
+  "resultHeldUntilClick": true,
+  "manualResultMove": "PROPOSE",
+  "paidModelCalls": 0
+}

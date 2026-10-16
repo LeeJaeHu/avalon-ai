@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "localWorker": true,
+  "fixedNewGameMedium": true,
+  "endgameExposureSettingVerified": true,
+  "discussionPolicyVerified": true,
+  "clientGenerationOverridesIgnored": true,
+  "acceptedActors": 4,
+  "failureCalls": 1,
+  "concurrentGenerationCalls": 1,
+  "staleDiscarded": true,
+  "syntheticModelCalls": 8,
+  "externalProviderCalls": 0
+}

@@ -76,3 +76,11 @@ FROM events WHERE events.type = 'CHAT' ORDER BY events.at DESC LIMIT 20;
 행동 선택의 trace는 gameId/stateVersion/actor/requestType → `selection.id`/inputHash → JEV 선택 또는 오류 → 서버 검증/버전 재확인 → 상태 적용으로 연결한다. 개인 행동 사건의 `detail.selection`은 선택 ID·후보 수·분포·확신도·모델·판별 버전·사용량·지연·대체 여부를 기록한다. JEV 전송도 기존 model_usage UUID의 REQUESTED/최종 상태를 갱신하므로 폐기/실패 사용량을 포함한다. 선의 성공 제출은 RULE이며 모델 호출로 세지 않는다. JEV는 thinking 문장을 생성하지 않는다. Gemini 대화의 명시적 thinking 자기보고와 본인의 직전 생각 기억은 유지하고 실제 선택은 별도 privateActions에 보존한다.
 
 `ROLE_GUESS` 사건과 종료 로그의 roleGuess에 AI4명의 추측·개별 정오·correct/total·원정 수·사용자 역할/시작 지식·시작 aiConfig를 저장한다. 점수와 정체는 ENDED 전의 일반 응답·진단·AI 입력에서 제외한다. 기존 D1 games.state/events.detail에 저장하며 별도 테이블이나 마이그레이션은 없다. 5연속 부결·중도 재시작은 추측 미실시로 구분한다. 정답률은 사용자 경험과 시작 정보·악의 기만에도 좌우되며 승률·전략 품질과 구분해 조건별로 비교한다. 관련 반복 검사는 `site/tests/action-selection.test.mjs`, `site/tests/role-guess.test.mjs`, `site/tests/api-smoke.mjs`, `site/tests/ui-role-guess.mjs`다. 실제 모델 품질 비교는 미실시다.
+### 2026-10-06 새 사건 첫 응답 누락
+
+- 기존 events.detail.routing.requiredResponse에 NEW_TEAM_REACTION_REQUIRED, VOTE_RESULT_REACTION_REQUIRED, QUEST_RESULT_REACTION_REQUIRED 또는 HUMAN_REPLY_REQUIRED를 기록한다. JEV 선택·상태·분포·지연·비용은 기존 필드로 남긴다. 새 사건 입력은 공개 event와 최근 사건만 포함한다.
+- 첫 사건 반응의 Gemini 생성 실패는 ai_failures와 REPLY_GENERATION_FAILURE 대체 CHAT 사건을 함께 남긴다. 안내 발언을 모델의 전략 반응으로 집계하지 않는다. 이후 WAIT 및 세 회 상한은 정상 토론 종료와 구분한다.
+- 실제 수정 전 최근 완료 판에서 정상 JEV WAIT 11회와 Gemini CHAT 4회가 관측됐다. 근거: `docs/review-assets/event-response-2026-10-06/operational-evidence.json`, events id1352~1407. 초기 scripted 발언은 Gemini CHAT 수에 포함하지 않았다. 한 판의 운영 관찰이며 전체 서비스 비율이 아니다. 수정 후 실제 모델의 첫 반응 성공률·전략 유용성·비용 차이는 미측정이다.
+### 2026-10-06 발언 필요성/발언자 분리
+
+진행자 판별 버전은 jev-discussion-v5-need-and-speaker다. 수동 JEV 요청은 discussion(TALK/WAIT)와 responder(AI4명)를 한 번에 평가하며 기존 routing 기록에 discussionChoice/discussionConfidence/discussionProbabilities와 responderChoice를 추가한다. 기존 jevChoice는 필요성을 반영한 유효 선택(AI 또는 WAIT), selectedActor는 실제 적용한 발언 기회 대상이다. 사용자 응답 보장이 WAIT를 바꾸면 HUMAN_REPLY_REQUIRED를 남긴다. Gemini 자율 SILENCE는 Gemini 사용량/자기보고 생각을 기록하고 생성 실패와 구분한다. 이전 첫 사건 응답 보장 기록은 과거 관측으로 보존하며 최신 정책에서는 강제 조건을 제거했다. 추가 필요성 질문의 비용과 자연스러움 차이는 실제 모델 평가 전까지 미확인이다.

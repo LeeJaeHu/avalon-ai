@@ -1,0 +1,17 @@
+{
+  "data": "synthetic local game, no provider credentials",
+  "screens": ["team draft", "revised team", "vote approved", "vote rejected", "quest success", "quest failure"],
+  "viewports": ["default", "670x668", "390x668"],
+  "dismissViaConfirm": true,
+  "dismissViaEscape": true,
+  "dismissedDialogAbsentAfterReload": true,
+  "reopenCurrentResult": true,
+  "successAnimationComputedName": "success-seal",
+  "heldResultVersionWhilePopupOpen": 12013,
+  "teamVersionBeforeDismiss": 13002,
+  "teamVersionAfterDismissAndAiReply": 13003,
+  "mobileFailureDialog": {"width": 358.4, "height": 595.3, "clientHeight": 594, "scrollHeight": 594},
+  "paidModelCalls": 0,
+  "actualModelQualityEvaluation": "not performed",
+  "reducedMotion": "CSS media rule present; browser OS preference override not tested"
+}

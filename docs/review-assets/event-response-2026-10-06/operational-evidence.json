@@ -1,0 +1,493 @@
+{
+  "checkedAt": "2026-10-06T10:05:32.554Z",
+  "source": "Sites DB events read-only",
+  "gameId": "9059d0b8-984a-4f7c-ba5c-eb7ffd2b7295",
+  "range": [
+    1352,
+    1407
+  ],
+  "events": [
+    {
+      "id": 1352,
+      "version": 0,
+      "actor": "system",
+      "type": "GAME_CREATED",
+      "at": "2026-10-06T09:49:32.114Z"
+    },
+    {
+      "id": 1353,
+      "version": 1,
+      "actor": "human",
+      "type": "START",
+      "at": "2026-10-06T09:51:04.785Z"
+    },
+    {
+      "id": 1354,
+      "version": 2,
+      "actor": "ai1",
+      "type": "CHAT",
+      "at": "2026-10-06T09:51:05.966Z",
+      "aiMode": "scripted"
+    },
+    {
+      "id": 1355,
+      "version": 3,
+      "actor": "ai1",
+      "type": "PROPOSE",
+      "at": "2026-10-06T09:51:07.558Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1356,
+      "version": 4,
+      "actor": "ai2",
+      "type": "CHAT",
+      "at": "2026-10-06T09:51:19.036Z",
+      "aiMode": "gemini",
+      "routingStatus": "OK",
+      "selectedActor": "ai2",
+      "jevChoice": "ai2"
+    },
+    {
+      "id": 1357,
+      "version": 5,
+      "actor": "ai3",
+      "type": "CHAT",
+      "at": "2026-10-06T09:51:22.966Z",
+      "aiMode": "gemini",
+      "routingStatus": "OK",
+      "selectedActor": "ai3",
+      "jevChoice": "ai3"
+    },
+    {
+      "id": 1358,
+      "version": 6,
+      "actor": "ai4",
+      "type": "CHAT",
+      "at": "2026-10-06T09:51:26.394Z",
+      "aiMode": "gemini",
+      "routingStatus": "OK",
+      "selectedActor": "ai4",
+      "jevChoice": "ai4"
+    },
+    {
+      "id": 1359,
+      "version": 7,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:51:27.648Z",
+      "aiMode": "discussion-complete"
+    },
+    {
+      "id": 1360,
+      "version": 8,
+      "actor": "human",
+      "type": "CHAT",
+      "at": "2026-10-06T09:51:38.004Z"
+    },
+    {
+      "id": 1361,
+      "version": 9,
+      "actor": "ai2",
+      "type": "CHAT",
+      "at": "2026-10-06T09:51:41.409Z",
+      "aiMode": "gemini",
+      "routingStatus": "OK",
+      "selectedActor": "ai2",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1362,
+      "version": 10,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:51:43.032Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1363,
+      "version": 11,
+      "actor": "human",
+      "type": "START_VOTE",
+      "at": "2026-10-06T09:51:47.109Z"
+    },
+    {
+      "id": 1364,
+      "version": 12,
+      "actor": "ai1",
+      "type": "VOTE",
+      "at": "2026-10-06T09:51:48.640Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1365,
+      "version": 13,
+      "actor": "ai2",
+      "type": "VOTE",
+      "at": "2026-10-06T09:51:50.227Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1366,
+      "version": 14,
+      "actor": "human",
+      "type": "VOTE",
+      "at": "2026-10-06T09:51:53.457Z"
+    },
+    {
+      "id": 1367,
+      "version": 15,
+      "actor": "ai3",
+      "type": "VOTE",
+      "at": "2026-10-06T09:51:55.148Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1368,
+      "version": 16,
+      "actor": "ai4",
+      "type": "VOTE",
+      "at": "2026-10-06T09:51:56.716Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1369,
+      "version": 17,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:52:00.761Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1370,
+      "version": 18,
+      "actor": "human",
+      "type": "CONTINUE",
+      "at": "2026-10-06T09:52:02.441Z"
+    },
+    {
+      "id": 1371,
+      "version": 19,
+      "actor": "ai1",
+      "type": "CARD",
+      "at": "2026-10-06T09:52:03.953Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1372,
+      "version": 20,
+      "actor": "ai2",
+      "type": "CARD",
+      "at": "2026-10-06T09:52:05.572Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1373,
+      "version": 21,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:52:09.415Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1374,
+      "version": 22,
+      "actor": "human",
+      "type": "CONTINUE",
+      "at": "2026-10-06T09:52:12.330Z"
+    },
+    {
+      "id": 1375,
+      "version": 23,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:52:13.864Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1376,
+      "version": 24,
+      "actor": "ai2",
+      "type": "PROPOSE",
+      "at": "2026-10-06T09:52:16.247Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1377,
+      "version": 25,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:54:28.354Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1378,
+      "version": 26,
+      "actor": "human",
+      "type": "START_VOTE",
+      "at": "2026-10-06T09:54:32.815Z"
+    },
+    {
+      "id": 1379,
+      "version": 27,
+      "actor": "ai1",
+      "type": "VOTE",
+      "at": "2026-10-06T09:54:34.369Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1380,
+      "version": 28,
+      "actor": "ai2",
+      "type": "VOTE",
+      "at": "2026-10-06T09:54:35.962Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1381,
+      "version": 29,
+      "actor": "ai3",
+      "type": "VOTE",
+      "at": "2026-10-06T09:54:37.548Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1382,
+      "version": 30,
+      "actor": "ai4",
+      "type": "VOTE",
+      "at": "2026-10-06T09:54:39.184Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1383,
+      "version": 31,
+      "actor": "human",
+      "type": "VOTE",
+      "at": "2026-10-06T09:54:42.196Z"
+    },
+    {
+      "id": 1384,
+      "version": 32,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:54:45.509Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1385,
+      "version": 33,
+      "actor": "human",
+      "type": "CONTINUE",
+      "at": "2026-10-06T09:54:47.831Z"
+    },
+    {
+      "id": 1386,
+      "version": 34,
+      "actor": "ai1",
+      "type": "CARD",
+      "at": "2026-10-06T09:54:49.327Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1387,
+      "version": 35,
+      "actor": "human",
+      "type": "CARD",
+      "at": "2026-10-06T09:54:50.389Z"
+    },
+    {
+      "id": 1388,
+      "version": 36,
+      "actor": "ai2",
+      "type": "CARD",
+      "at": "2026-10-06T09:54:51.926Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1389,
+      "version": 37,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:54:55.795Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1390,
+      "version": 38,
+      "actor": "human",
+      "type": "CONTINUE",
+      "at": "2026-10-06T09:54:58.082Z"
+    },
+    {
+      "id": 1391,
+      "version": 39,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:54:59.570Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1392,
+      "version": 40,
+      "actor": "ai3",
+      "type": "PROPOSE",
+      "at": "2026-10-06T09:55:01.246Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1393,
+      "version": 41,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:55:04.998Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1394,
+      "version": 42,
+      "actor": "human",
+      "type": "START_VOTE",
+      "at": "2026-10-06T09:55:09.153Z"
+    },
+    {
+      "id": 1395,
+      "version": 43,
+      "actor": "ai1",
+      "type": "VOTE",
+      "at": "2026-10-06T09:55:10.918Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1396,
+      "version": 44,
+      "actor": "human",
+      "type": "VOTE",
+      "at": "2026-10-06T09:55:11.469Z"
+    },
+    {
+      "id": 1397,
+      "version": 45,
+      "actor": "ai2",
+      "type": "VOTE",
+      "at": "2026-10-06T09:55:13.085Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1398,
+      "version": 46,
+      "actor": "ai3",
+      "type": "VOTE",
+      "at": "2026-10-06T09:55:14.720Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1399,
+      "version": 47,
+      "actor": "ai4",
+      "type": "VOTE",
+      "at": "2026-10-06T09:55:16.357Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1400,
+      "version": 48,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:55:19.014Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1401,
+      "version": 49,
+      "actor": "human",
+      "type": "CONTINUE",
+      "at": "2026-10-06T09:55:20.381Z"
+    },
+    {
+      "id": 1402,
+      "version": 50,
+      "actor": "ai2",
+      "type": "CARD",
+      "at": "2026-10-06T09:55:21.891Z",
+      "aiMode": "jev"
+    },
+    {
+      "id": 1403,
+      "version": 51,
+      "actor": "ai3",
+      "type": "CARD",
+      "at": "2026-10-06T09:55:23.157Z",
+      "aiMode": "rule"
+    },
+    {
+      "id": 1404,
+      "version": 52,
+      "actor": "human",
+      "type": "ROLE_GUESS",
+      "at": "2026-10-06T09:56:34.565Z"
+    },
+    {
+      "id": 1405,
+      "version": 53,
+      "actor": "system",
+      "type": "SILENCE",
+      "at": "2026-10-06T09:56:36.155Z",
+      "aiMode": "jev-wait",
+      "routingStatus": "OK",
+      "selectedActor": "WAIT",
+      "jevChoice": "WAIT"
+    },
+    {
+      "id": 1406,
+      "version": 54,
+      "actor": "human",
+      "type": "CONTINUE",
+      "at": "2026-10-06T09:56:38.086Z"
+    },
+    {
+      "id": 1407,
+      "version": 55,
+      "actor": "ai2",
+      "type": "ASSASSINATE",
+      "at": "2026-10-06T09:56:39.583Z",
+      "aiMode": "jev"
+    }
+  ],
+  "metrics": {
+    "events": 56,
+    "jevWait": 11,
+    "geminiChat": 4,
+    "modelFailures": 0
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "width": 1366,
+      "phase": "TEAM_DISCUSSION",
+      "outcome": "TALK",
+      "geminiCalls": 1,
+      "jevCalls": 2,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "TEAM_DISCUSSION",
+      "outcome": "WAIT",
+      "geminiCalls": 0,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "TEAM_DISCUSSION",
+      "outcome": "SILENCE",
+      "geminiCalls": 1,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "VOTE_RESULT",
+      "outcome": "TALK",
+      "geminiCalls": 1,
+      "jevCalls": 2,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "VOTE_RESULT",
+      "outcome": "WAIT",
+      "geminiCalls": 0,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "VOTE_RESULT",
+      "outcome": "SILENCE",
+      "geminiCalls": 1,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "QUEST_RESULT",
+      "outcome": "TALK",
+      "geminiCalls": 1,
+      "jevCalls": 2,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "QUEST_RESULT",
+      "outcome": "WAIT",
+      "geminiCalls": 0,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "QUEST_RESULT",
+      "outcome": "SILENCE",
+      "geminiCalls": 1,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "TEAM_DISCUSSION",
+      "outcome": "TALK",
+      "geminiCalls": 1,
+      "jevCalls": 2,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "TEAM_DISCUSSION",
+      "outcome": "WAIT",
+      "geminiCalls": 0,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "TEAM_DISCUSSION",
+      "outcome": "SILENCE",
+      "geminiCalls": 1,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "VOTE_RESULT",
+      "outcome": "TALK",
+      "geminiCalls": 1,
+      "jevCalls": 2,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "VOTE_RESULT",
+      "outcome": "WAIT",
+      "geminiCalls": 0,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "VOTE_RESULT",
+      "outcome": "SILENCE",
+      "geminiCalls": 1,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "QUEST_RESULT",
+      "outcome": "TALK",
+      "geminiCalls": 1,
+      "jevCalls": 2,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "QUEST_RESULT",
+      "outcome": "WAIT",
+      "geminiCalls": 0,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "QUEST_RESULT",
+      "outcome": "SILENCE",
+      "geminiCalls": 1,
+      "jevCalls": 1,
+      "manualContinueEnabled": true
+    }
+  ],
+  "errors": [],
+  "externalProviderCalls": 0
+}

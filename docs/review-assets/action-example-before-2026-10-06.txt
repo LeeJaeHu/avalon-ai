@@ -1,0 +1,9 @@
+ '[역할]':roles[view.role], '[역할별 목표]':goals[view.role],
+ '[공개 게임 상태 JSON]':JSON.stringify(publicState),
+ '[자기 역할·알고 있는 플레이어·자기 투표·자기 카드·역할 추론 정보 JSON]':JSON.stringify(personalInfo),
+ '[행동 종류·발언자·답할 메시지 등의 JSON]':JSON.stringify({...request,name:NAMES[request.actor],requiredTeamSize:view.size,allowedPlayerIds:view.ids,
+   allowedTypes:request.type==='CHAT'?['CHAT','SILENCE']:[request.type],
+   outputExample:{thinking:'',evidence:{summary:'선택에 대한 짧은 설명',references:[],confidence:'LOW'},type:request.type,text:request.type==='CHAT'?'발언 내용':'',speechAct:request.type==='CHAT'?'ANSWER':'',
+     team:request.type==='PROPOSE'?view.ids.slice(0,view.size):[],choice:request.type==='VOTE'?'APPROVE':request.type==='CARD'?'SUCCESS':'',target:request.type==='ASSASSINATE'?view.ids.find(id=>id!==request.actor):''}})
+ };
+ const evidenceInstruction = '출력 JSON에 evidence를 추가하세요. evidence는 summary(선택에 대한 1~2문장·240자 이하의 짧은 설명), references(이번 요청의 evidenceReferenceIds 중 실제 참조한 출처 ID 최대 4개), confidence(LOW/MEDIUM/HIGH)로 구성합니다. 자세한 내부 추론이나 thinking을 복사하지 마세요. 근거가 부족하면 추측임을 밝히고 LOW로 표시하세요. evidence는 플레이 중 공개되지 않고 종료 후 분석용으로만 저장되며, 이후 판단에 다시 입력되지 않습니다. 출처나 관찰하지 못한 사건을 지어내지 마세요. SILENCE에도 침묵한 짧은 사유를 기록하세요.\n\n';

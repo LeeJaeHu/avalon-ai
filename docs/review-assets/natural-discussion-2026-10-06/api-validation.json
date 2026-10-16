@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "phases": [
+    "TEAM_DISCUSSION",
+    "VOTE_RESULT",
+    "QUEST_RESULT"
+  ],
+  "fallbackActor": "ai3",
+  "modelCalls": 15,
+  "requiredChats": 2,
+  "externalProviderCalls": 0
+}

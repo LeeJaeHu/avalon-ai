@@ -1,0 +1,23 @@
+{
+  "checks": [
+    {
+      "width": 1366,
+      "mode": "loyal-fixed"
+    },
+    {
+      "width": 1366,
+      "mode": "random"
+    },
+    {
+      "width": 390,
+      "mode": "loyal-fixed"
+    },
+    {
+      "width": 390,
+      "mode": "random"
+    }
+  ],
+  "errors": [],
+  "synthetic": true,
+  "modelCalls": 0
+}

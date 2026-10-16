@@ -1,0 +1,46 @@
+{
+  "checks": [
+    {
+      "width": 1366,
+      "selected": "gemini",
+      "model": "gemini-3.5-flash-lite"
+    },
+    {
+      "width": 1366,
+      "selected": "gemini",
+      "model": "gemini-3.5-flash"
+    },
+    {
+      "width": 1366,
+      "selected": "hybrid",
+      "model": "gemini-3.5-flash-lite"
+    },
+    {
+      "width": 1366,
+      "selected": "hybrid",
+      "model": "gemini-3.5-flash"
+    },
+    {
+      "width": 390,
+      "selected": "gemini",
+      "model": "gemini-3.5-flash-lite"
+    },
+    {
+      "width": 390,
+      "selected": "gemini",
+      "model": "gemini-3.5-flash"
+    },
+    {
+      "width": 390,
+      "selected": "hybrid",
+      "model": "gemini-3.5-flash-lite"
+    },
+    {
+      "width": 390,
+      "selected": "hybrid",
+      "model": "gemini-3.5-flash"
+    }
+  ],
+  "errors": [],
+  "modelCalls": 0
+}

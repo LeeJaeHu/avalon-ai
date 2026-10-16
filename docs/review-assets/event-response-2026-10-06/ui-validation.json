@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "width": 1366,
+      "phase": "TEAM_DISCUSSION",
+      "firstReaction": true,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "VOTE_RESULT",
+      "firstReaction": true,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 1366,
+      "phase": "QUEST_RESULT",
+      "firstReaction": true,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "TEAM_DISCUSSION",
+      "firstReaction": true,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "VOTE_RESULT",
+      "firstReaction": true,
+      "manualContinueEnabled": true
+    },
+    {
+      "width": 390,
+      "phase": "QUEST_RESULT",
+      "firstReaction": true,
+      "manualContinueEnabled": true
+    }
+  ],
+  "errors": [],
+  "externalProviderCalls": 0
+}
