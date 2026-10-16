@@ -13,7 +13,7 @@ export function resultPopup(game) {
     const votes=(proposal.votes??[]).filter(v=>game.ids.includes(v.actor)&&['APPROVE','REJECT'].includes(v.choice)).map(v=>({id:v.actor,name:game.names[v.actor]??v.actor,choice:v.choice}));
     if(votes.length!==game.ids.length)return null;
     const approve=votes.filter(v=>v.choice==='APPROVE').length,approved=proposal.status==='APPROVED';
-    return {...common,tone:approved?'approved':'rejected',title:approved?'원정 팀 승인':'원정 팀 부결',description:approved?'과반수가 찬성했습니다. 이 멤버들이 원정에 참여합니다.':proposal.attempt===5?'다섯 번째 팀이 부결되었습니다. 결과를 확인하면 악의 승리가 확정됩니다.':'과반수가 반대했습니다. 다음 리더가 새로운 팀을 제안합니다.',emblem:approved?'approved':'rejected',votes,approve,reject:votes.length-approve};
+    return {...common,tone:approved?'approved':'rejected',title:approved?'원정 팀 승인':'원정 팀 부결',description:approved?'과반수가 찬성했습니다. 이 멤버들이 원정에 참여합니다.':proposal.attempt===5?(game.roleGuess?.pending?'다섯 번째 팀이 부결되었습니다. 역할을 추측한 뒤 악의 승리 결과를 확인합니다.':'다섯 번째 팀이 부결되었습니다. 결과를 확인하면 악의 승리가 확정됩니다.'):'과반수가 반대했습니다. 다음 리더가 새로운 팀을 제안합니다.',emblem:approved?'approved':'rejected',votes,approve,reject:votes.length-approve};
   }
   const success=quest.result==='SUCCESS';
   return {...common,tone:success?'success':'failure',title:success?'원정 성공':'원정 실패',description:success?'원정대가 임무를 완수했습니다. 선의 원정 기록에 성공 하나가 더해집니다.':'실패 카드가 나왔습니다. 이번 원정 멤버와 이전 발언을 함께 살펴보세요.',emblem:success?'success':'failure',fails:quest.fails};

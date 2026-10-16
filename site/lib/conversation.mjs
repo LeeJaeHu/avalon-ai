@@ -3,13 +3,18 @@ export const CONVERSATION_VERSION=1;
 export const GRACE_MS=8000;
 export function manualNextStep(game, {busy=false,aiBusy=false,draft=false,teamChanged=false}={}) {
   const type=game.phase==='ROLE_REVEAL'?'START':game.phase==='TEAM_DISCUSSION'?'START_VOTE':['VOTE_RESULT','QUEST_RESULT'].includes(game.phase)?'CONTINUE':null;
-  const label=game.phase==='ROLE_REVEAL'?'게임 시작 →':game.phase==='TEAM_DISCUSSION'?'이 팀으로 투표 →':game.phase==='VOTE_RESULT'?(game.proposals.at(-1)?.status==='APPROVED'?'원정 출발 →':'다음 리더로 →'):game.phase==='QUEST_RESULT'?'결과 확인하고 계속 →':'다음 단계 →';
+  const label=game.phase==='ROLE_REVEAL'?'게임 시작 →':game.phase==='TEAM_DISCUSSION'?'이 팀으로 투표 →':game.phase==='VOTE_RESULT'?(game.proposals.at(-1)?.status==='APPROVED'?'원정 출발 →':game.attempt===5?'최종 결과 확인 →':'다음 리더로 →'):game.phase==='QUEST_RESULT'?'결과 확인하고 계속 →':'다음 단계 →';
   const reason=game.phase==='ENDED'?'게임이 종료됐습니다.':game.paused?'일시정지를 해제해 주세요.':busy?'요청을 처리하고 있습니다.':draft?'작성 중인 메시지를 보내거나 지워 주세요.':teamChanged?'수정한 팀을 먼저 공유해 주세요.':game.revisionRequested?'리더가 팀을 다시 검토하고 있습니다.':aiBusy||game.aiPending||game.pendingDiscussion||game.pendingSpeech?'AI가 대화하거나 다음 응답을 준비하고 있습니다.':game.phase==='PROPOSE'?'팀 초안을 먼저 공유해 주세요.':game.phase==='VOTE'?'모든 참가자의 찬반 투표를 기다립니다.':game.phase==='QUEST'?'원정팀의 성공 여부 투표를 기다립니다.':game.phase==='ASSASSINATE'?'암살자의 선택을 기다립니다.':null;
   const guessPending=game.roleGuess?.pending||roleGuessPending(game);
+  if(game.assessmentPending||game.pendingAssessment?.actors?.length)return {type,label,reason:'AI가 현재 상황을 판단하고 있습니다.',disabled:true};
   return {type,label,reason:guessPending?'플레이어들의 역할 추측을 먼저 제출해 주세요.':reason,disabled:!type||!!reason||!!guessPending};
 }
 export function humanNeedsReply(game) {
   return game.messages.find(m=>m.id===game.pendingSpeech)?.actor==='human';
+}
+export function requiredDiscussionResponse(game) {
+  if (!game.aiConfig?.conversationVersion) return null;
+  return humanNeedsReply(game) ? 'HUMAN_REPLY_REQUIRED' : null;
 }
 export function progressOptions(game) {
   const options=['TALK','WAIT'];

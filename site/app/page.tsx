@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {COMPARISON_MODES,comparisonMode,comparisonPreset} from '../lib/comparison.mjs';
+import {scoreRoleGuess} from '../lib/role-guess.mjs';
+import {GEMINI_MODELS,GEMINI_GENERATION_VERSION,GEMINI_THINKING_LEVELS} from '../lib/gemini-models.mjs';
 import {manualNextStep} from '../lib/conversation.mjs';
 import {resultPopup,questHistoryPopup} from '../lib/result-popup.mjs';
 import {ROLE_GUIDES,roleGuide,privateRoleKnowledge,roleInteractions} from '../lib/role-guide.mjs';
@@ -23,6 +25,10 @@ export default function Home() {
   const [game,setGame] = useState<any>(null);
   const [mode,setMode] = useState('practice');
   const [nextComparison,setNextComparison] = useState('gemini');
+  const [nextHumanRoleMode,setNextHumanRoleMode] = useState('loyal-fixed');
+  const [nextDiscussionPolicy,setNextDiscussionPolicy] = useState('player');
+  const [nextEndgameExposure,setNextEndgameExposure] = useState(false);
+  const [modelChoice,setModelChoice] = useState('');
   const [nextRouting,setNextRouting] = useState('baseline');
   const [nextAction,setNextAction] = useState('gemini');
   const [routingReady,setRoutingReady] = useState(false);
@@ -41,6 +47,7 @@ export default function Home() {
   const [popup,setPopup] = useState<any>(null);
   const [guessOpen,setGuessOpen] = useState(false);
   const [guesses,setGuesses] = useState<Record<string,string>>({});
+  const [guessFactions,setGuessFactions] = useState<Record<string,string>>({});
   const viewedPopups=useRef(new Set<string>());
   const popupReturnRef=useRef<HTMLElement|null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -90,7 +97,7 @@ export default function Home() {
     processingRef.current=false;setBusy(false);setProgress('');
   }
   function act(input:Record<string,unknown>) {
-    if(input.type==='NEW'){setRolePanel(null);setMessage('');setGuesses({});setGuessOpen(false);input={...input,routingMode:nextRouting,actionMode:nextAction,...(nextComparison==='custom'?{}:{comparisonMode:nextComparison})};chatAtBottom.current=true;setReplyTo(null);}
+    if(input.type==='NEW'){setModelChoice('');setRolePanel(null);setMessage('');setGuesses({});setGuessFactions({});setGuessOpen(false);input={...input,humanRoleMode:nextHumanRoleMode,endgameExposureAllowed:nextEndgameExposure,discussionPolicy:nextDiscussionPolicy,routingMode:nextRouting,actionMode:nextAction,...(nextComparison==='custom'?{}:{comparisonMode:nextComparison})};chatAtBottom.current=true;setReplyTo(null);}
     aiEpochRef.current++;
     // Let the server finish its ledger and release the lease; epochs discard stale UI replies.
     aiControllerRef.current=null;setAiBusy(false);
@@ -127,6 +134,7 @@ export default function Home() {
     setPopup(null);
   }
   const guessPending=!!game?.roleGuess?.pending;
+  const guessScore=game?.phase==='ENDED'&&game.roleGuess ? scoreRoleGuess(game.roles,game.roleGuess.guesses)??game.roleGuess : null;
   useEffect(()=>{
     if(!guessPending){setGuessOpen(false);return;}
     if(popup||rolePanel)return;
@@ -135,7 +143,7 @@ export default function Home() {
     try{viewed ||= JSON.parse(sessionStorage.getItem(`avalon-popup:${game.id}`)??'[]').includes(candidate?.key);}catch{}
     if(viewed)setGuessOpen(true);
   },[game?.id,guessPending,popup?.key,rolePanel]);
-  useEffect(()=>{setGuesses({});},[game?.id]);
+  useEffect(()=>{setGuesses({});setGuessFactions({});},[game?.id]);
   const aiTurn=game?.aiPending;
   useEffect(()=>{
     if(!game||popup||rolePanel||roleIntro||guessPending||busy||aiBusy||error||message.trim()||(!aiTurn&&!game.idleDueAt))return;
@@ -183,18 +191,22 @@ export default function Home() {
     {game.phase==='QUEST'&&<div><h3>원정 성공 여부 투표</h3><p>개별 선택은 공개되지 않습니다.</p>{game.team.includes('human')&&!game.cardSubmitted?<div className="choices"><button className="primary" disabled={game.paused||busy} onClick={()=>act({type:'CARD',choice:'SUCCESS'})}>성공</button>{['ASSASSIN','MINION'].includes(game.role)&&<button className="outline danger" disabled={game.paused||busy} onClick={()=>act({type:'CARD',choice:'FAIL'})}>실패</button>}</div>:<p className="waiting">원정팀의 성공 여부 투표를 기다립니다.</p>}</div>}
     {questResult&&<div className="inline-result"><h3 className={questResult.result==='SUCCESS'?'good':'bad'}>원정 {questResult.result==='SUCCESS'?'성공':'실패'}</h3><p>{questResult.team.map(name).join(' · ')} · 실패 카드 {questResult.fails}장</p></div>}
     {game.phase==='ASSASSINATE'&&<div><h3>마지막 선택, 멀린 암살</h3><p>암살자가 멀린을 맞히면 악이 승리합니다.</p>{game.role==='ASSASSIN'?<div className="choices">{game.ids.filter((id:string)=>id!=='human').map((id:string)=><button className="outline" key={id} disabled={game.paused||busy} onClick={()=>act({type:'ASSASSINATE',target:id})}>{name(id)} 지목</button>)}</div>:<p className="waiting">암살자의 선택을 기다립니다.</p>}</div>}
-    {game.phase==='ENDED'&&<div className="outcome"><h2>{game.winner==='GOOD'?'선의 승리':'악의 승리'}</h2><p>{game.assassination?`암살 대상: ${name(game.assassination)}`:'임무와 투표 결과로 게임이 끝났습니다.'}</p><div className="revealed">{game.ids.map((id:string)=><span key={id}>{name(id)} · {roleNames[game.roles[id]]}</span>)}</div><a className="outline" href="/api/game?export=1" download={`avalon-${game.id}.json`}>게임 기록 다운로드</a></div>}
+    {game.phase==='ENDED'&&<div className="outcome"><h2>{game.winner==='GOOD'?'선의 승리':'악의 승리'}</h2><p>{game.assassination?`암살 대상: ${name(game.assassination)}`:'임무와 투표 결과로 게임이 끝났습니다.'}</p><div className="revealed">{game.ids.map((id:string)=><span key={id}>{name(id)} · {roleNames[game.roles[id]]}</span>)}</div>{game.modelGuess?.pending&&<form onSubmit={e=>{e.preventDefault();act({type:'MODEL_GUESS',choice:modelChoice});}}><label htmlFor="model-guess">이번 게임은 어떤 모델이었던 것 같나요?</label><select id="model-guess" value={modelChoice} onChange={e=>setModelChoice(e.target.value)} disabled={busy}><option value="">예상 모델 선택</option>{Object.entries(GEMINI_MODELS).map(([id,model])=><option key={id} value={id}>{model.label}{game.geminiGenerationVersion===GEMINI_GENERATION_VERSION?` · ${GEMINI_THINKING_LEVELS[id as keyof typeof GEMINI_THINKING_LEVELS]}`:""}</option>)}</select><button disabled={busy||!modelChoice}>모델 추측 제출</button><p>제출 후 실제 모델과 게임 기록을 공개합니다.</p></form>}{game.modelGuess?.submitted&&<p role="status">실제 모델: {GEMINI_MODELS[game.aiModel as keyof typeof GEMINI_MODELS]?.label??game.aiModel}{game.modelGuess.actualThinkingLevel?` · ${game.modelGuess.actualThinkingLevel}`:''} · {game.modelGuess.correct?'모델 추측 정답':'모델 추측 오답'}</p>}{!game.modelGuess?.hidden&&<a className="outline" href="/api/game?export=1" download={`avalon-${game.id}.json`}>게임 기록 다운로드</a>}</div>}
     {guessPending&&<button className="primary guess-reopen" disabled={busy||game.paused} onClick={()=>setGuessOpen(true)}>플레이어 역할 맞히기</button>}
-    {game.phase==='ENDED'&&game.roleGuess&&<div className="guess-summary"><h3>역할 추측 · {game.roleGuess.correct} / {game.roleGuess.total}명 정답</h3><div>{Object.entries(game.roleGuess.guesses).map(([id,role])=><p key={id}><b>{name(id)}</b><span>{roleNames[String(role)]} → {roleNames[game.roles[id]]}</span><strong className={game.roleGuess.matches[id]?'good':'bad'}>{game.roleGuess.matches[id]?'정답':'오답'}</strong></p>)}</div></div>}
-    {nextStep.type&&<div className="decision-reading"><button className="primary" disabled={nextStep.disabled} aria-describedby="next-stage-status" onClick={()=>act({type:nextStep.type})}>{nextStep.label}</button><small id="next-stage-status" role="status">{nextStep.reason??'의견을 더 나누거나 다음 단계로 이동하세요.'}</small></div>}
+    {guessScore&&<div className="guess-summary"><h3>역할 추측 · {guessScore.correct} / {guessScore.total}명 정답</h3><p>시작 역할: {roleNames[game.roleGuess.humanRole??game.role]} · 진영 {guessScore.factionTotal ? `${guessScore.factionCorrect} / ${guessScore.factionTotal}명 정답` : '미확인'} · 세부 역할 {guessScore.correct} / {guessScore.total}명 정답</p><div>{Object.entries(game.roleGuess.guesses).map(([id,role])=><p key={id}><b>{name(id)}</b><span>{roleNames[String(role)]} → {roleNames[game.roles[id]]}</span><strong className={guessScore.matches[id]?'good':'bad'}>진영 {guessScore.factionMatches?.[id]?'정답':'오답'} · 역할 {guessScore.matches[id]?'정답':'오답'}</strong></p>)}</div></div>}
+    {nextStep.type&&<div className="decision-reading"><button className="primary" disabled={nextStep.disabled} aria-describedby="next-stage-status" onClick={()=>act({type:nextStep.type})}>{nextStep.label}</button><small id="next-stage-status" role="status">{nextStep.reason??'다음 단계로 진행할 수 있어요.'}</small></div>}
     {popupCandidate&&<button className="textbutton popup-reopen" onClick={event=>openPopup(popupCandidate,event.currentTarget)}>{popupCandidate.kind==='TEAM'?'팀 명단 자세히 보기':'결과 자세히 보기'} ↗</button>}
   </div>;
-  return <main className={`shell ${playing?'in-game':''}`}>
+  return <main className={`shell ${playing?'in-game':''} ${game?.phase==='ENDED'?'game-ended':''}`}>
     <header className="top"><div className="brand"><span className="sigil">♜</span><div><strong>AVALON</strong></div></div><div className="top-actions"><button className="outline" disabled={busy||!game||game.phase==='ENDED'} onClick={()=>act({type:game.paused?'RESUME':'PAUSE'})}>{game?.paused?'계속하기':'일시정지'}</button><button className="outline" disabled={busy} onClick={()=>{if(!game||confirm('현재 게임 기록을 자동 보관하고 새 게임을 시작할까요?')){act({type:'NEW'});}}}>새 게임</button>
       <details className="game-settings"><summary>설정</summary><div className="settings-content">
-        {!loading&&<section className="routing-picker" aria-label="새 게임의 AI 방식"><label htmlFor="comparison-mode">AI 비교 모드</label><select id="comparison-mode" value={nextComparison} disabled={busy} onChange={e=>{const selected=e.target.value;setNextComparison(selected);if(selected!=='custom'){const preset=comparisonPreset(selected);setNextRouting(preset.routingMode);setNextAction(preset.actionMode);}}}><option value="gemini">Gemini 단독</option><option value="hybrid" disabled={!routingReady}>JEV + Gemini</option><option value="custom">사용자 설정</option></select>{nextComparison==='custom'&&<><label htmlFor="routing-mode">발언자 선택</label><select id="routing-mode" value={nextRouting} disabled={busy} onChange={e=>setNextRouting(e.target.value)}><option value="baseline">기존 규칙</option><option value="jev" disabled={!routingReady}>JEV 진행자</option></select><label htmlFor="action-mode">행동 선택</label><select id="action-mode" value={nextAction} disabled={busy} onChange={e=>setNextAction(e.target.value)}><option value="gemini">Gemini</option><option value="jev" disabled={!routingReady}>JEV</option></select></>}<p>{nextComparison==='gemini'?'대화·행동: Gemini · 발언자: 기존 규칙':nextComparison==='hybrid'?'대화: Gemini · 발언자·행동: JEV':'발언자와 행동 선택을 각각 지정합니다.'} 다음 새 게임에 적용됩니다.{!routingReady&&' JEV 연결 준비 중입니다.'}</p>{game&&<p>현재 판: {mode==='practice'?'연습 AI':COMPARISON_MODES[comparisonMode(game) as keyof typeof COMPARISON_MODES]?.label??'사용자 설정'}</p>}<small>종료 후 게임 로그를 내려받으면 모드별 비용·호출·역할 추측 결과를 비교할 수 있습니다.</small></section>}
+        {!loading&&<section className="routing-picker"><label htmlFor="human-role-mode">사용자 역할 배정</label><select id="human-role-mode" value={nextHumanRoleMode} disabled={busy} onChange={e=>setNextHumanRoleMode(e.target.value)}><option value="loyal-fixed">실험 모드: 사용자 충신 고정</option><option value="random">역할 무작위</option></select><p>다음 새 게임부터 적용됩니다. 충신 고정 시 AI 네 명의 역할과 첫 리더는 무작위로 배정됩니다.</p>{game&&<small>현재 판 역할 배정: {game.humanRoleMode==='loyal-fixed'?'사용자 충신 고정':game.humanRoleMode==='random'?'역할 무작위':'기존 판 (설정 미기록)'}</small>}</section>}
+        {!loading&&<section className="routing-picker"><label htmlFor="discussion-policy">JEV 발언 판단 방식</label><select id="discussion-policy" value={nextDiscussionPolicy} disabled={busy||nextRouting!=='jev'} onChange={e=>setNextDiscussionPolicy(e.target.value)}><option value="player">플레이어별 발언 의사 판단</option><option value="moderator">진행자가 발언자 선택</option></select><p>개인 방식은 각 AI가 자신의 정보로 말할지 판단하고, 발언 희망자 중 한 명에게 기회를 줍니다. JEV 발언 판단을 사용하는 다음 새 게임부터 적용됩니다.{nextRouting!=='jev'&&' 현재 선택한 AI 방식은 기존 규칙으로 발언자를 정합니다.'}</p>{game&&<small>현재 판: {game.routingMode!=='jev'?'기존 규칙':game.discussionPolicy==='player'?'플레이어별 발언 의사 판단':'진행자가 발언자 선택'}</small>}</section>}
+        {!loading&&<section className="routing-picker"><label htmlFor="endgame-exposure">막판 정체 노출 허용</label><select id="endgame-exposure" value={nextEndgameExposure?'on':'off'} disabled={busy} onChange={e=>setNextEndgameExposure(e.target.value==='on')}><option value="off">끄기: 마지막까지 은폐 고려</option><option value="on">켜기: 막판 승리를 위해 노출 감수</option></select><p>끄면 역할 맞추기 전 막판에도 공개 입장과 은폐를 고려합니다. 필요한 반대를 금지하지는 않습니다. 다음 새 게임부터 적용됩니다.</p>{game&&<small>현재 판: {game.endgameExposureAllowed===false?'끄기':game.endgameExposureAllowed===true?'켜기':'기존 판 (설정 미기록)'}</small>}</section>}
+        {!loading&&<section className="routing-picker"><strong>Gemini Flash-Lite · MEDIUM</strong><p>새 게임은 Flash-Lite MEDIUM으로 진행합니다. 대화와 개인 상황 판단에 같은 설정을 사용합니다.</p><small>{game?.aiModel&&`현재 Gemini: ${GEMINI_MODELS[game.aiModel as keyof typeof GEMINI_MODELS]?.label??game.aiModel}`}</small></section>}
+        {!loading&&<section className="routing-picker" aria-label="새 게임의 AI 방식"><label htmlFor="comparison-mode">AI 비교 모드</label><select id="comparison-mode" value={nextComparison} disabled={busy} onChange={e=>{const selected=e.target.value;setNextComparison(selected);if(selected!=='custom'){const preset=comparisonPreset(selected);setNextRouting(preset.routingMode);setNextAction(preset.actionMode);}}}><option value="gemini">Gemini 단독</option><option value="hybrid" disabled={!routingReady}>JEV + Gemini</option><option value="custom">사용자 설정</option></select>{nextComparison==='custom'&&<><label htmlFor="routing-mode">발언자 선택</label><select id="routing-mode" value={nextRouting} disabled={busy} onChange={e=>setNextRouting(e.target.value)}><option value="baseline">기존 규칙</option><option value="jev" disabled={!routingReady}>JEV 발언 판단</option></select><label htmlFor="action-mode">행동 선택</label><select id="action-mode" value={nextAction} disabled={busy} onChange={e=>setNextAction(e.target.value)}><option value="gemini">Gemini</option><option value="jev" disabled={!routingReady}>JEV</option></select></>}<p>{nextComparison==='gemini'?'대화·행동: Gemini · 발언자: 기존 규칙':nextComparison==='hybrid'?'대화: Gemini · 발언자·행동: JEV':'발언자와 행동 선택을 각각 지정합니다.'} 다음 새 게임에 적용됩니다.{!routingReady&&' JEV 연결 준비 중입니다.'}</p>{game&&<p>현재 판: {mode==='practice'?'연습 AI':COMPARISON_MODES[comparisonMode(game) as keyof typeof COMPARISON_MODES]?.label??'사용자 설정'}</p>}<small>종료 후 게임 로그를 내려받으면 모드별 비용·호출·역할 추측 결과를 비교할 수 있습니다.</small></section>}
         {game?.usage&&<details className="usage-panel"><summary>이번 판 추정 비용 · {'$'+game.usage.costUsd.toFixed(6)}</summary><p>실제 API 응답 사용량 기준 · USD</p><table><thead><tr><th>모델</th><th>호출</th><th>입력</th><th>응답 / 추론</th><th>비용</th></tr></thead><tbody>{['gemini','jev'].map(provider=>{const u=game.usage.providers[provider];return <tr key={provider}><td>{provider==='gemini'?'Gemini':'JEV'}</td><td>{u.calls}</td><td>{u.input.toLocaleString()}</td><td>{u.output.toLocaleString()} / {u.thoughts.toLocaleString()}</td><td>{'$'+u.costUsd.toFixed(6)}</td></tr>;})}</tbody></table><small>일반 Global 단가 추정입니다. 재시도·폐기된 응답 포함, 중계·호스팅 비용 제외. 실제 청구액과 다를 수 있습니다.{game.usage.unknownCalls>0&&` 사용량 미확인 ${game.usage.unknownCalls}회는 미반영.`}{game.usage.legacyIncomplete&&' 기록 시작 전 사용량은 미포함.'}</small></details>}
-        {game&&<a className="textbutton" href="/api/game?diagnostics=1" download={`avalon-diagnostics-${game.id}.json`}>진단 로그 다운로드</a>}
+        {game&&!game.modelGuess?.hidden&&<a className="textbutton" href="/api/game?diagnostics=1" download={`avalon-diagnostics-${game.id}.json`}>진단 로그 다운로드</a>}
       </div></details>
     </div></header>
     {loading?<p>불러오는 중…</p>:!game?<section className="card welcome"><div className="crest">♜</div><p className="eyebrow">THE RESISTANCE · AVALON</p><h1>누구와 원정을 떠나시겠습니까?</h1><p>당신과 네 명의 AI가 원탁에 앉습니다. 팀을 제안하고, 서로의 근거를 묻고, 토론을 마치면 투표하세요.</p><button className="primary" disabled={busy} onClick={()=>act({type:'NEW'})}>원탁에 앉기 →</button></section>:game.paused&&!game.conversationVersion?<section className="card welcome pause-screen"><div className="crest">Ⅱ</div><h1>잠시 쉬어갑니다</h1><p>대화와 진행 상황은 저장되어 있습니다.</p><button className="primary" disabled={busy} onClick={()=>act({type:'RESUME'})}>원탁으로 돌아가기 →</button></section>:roleIntro?<section className="card welcome role-intro"><div className="crest">♜</div><h1>배정된 역할을 확인하세요</h1><p>역할과 승리 조건을 확인하면 게임을 시작합니다.</p></section>:<>
@@ -236,10 +248,14 @@ export default function Home() {
       <DialogContent showCloseButton={false} className="avalon-result-popup role-guess-popup">
         <span className="eyebrow">정체 공개 전 · 마지막 추측</span>
         <DialogTitle>누가 어떤 역할이었을까요?</DialogTitle>
-        <DialogDescription>지금까지의 대화와 원정 결과로 네 사람의 역할을 맞혀보세요. 제출은 한 번만 가능하며 정답과 점수는 게임이 끝난 뒤 공개됩니다.</DialogDescription>
+        <DialogDescription>지금까지의 대화와 투표·원정 결과로 네 사람의 진영을 먼저 고르고, 해당 진영의 역할을 선택하세요. 진영과 세부 역할을 각각 채점합니다. 제출은 한 번만 가능하며 정답과 점수는 게임이 끝난 뒤 공개됩니다.</DialogDescription>
         <p className="guess-role-counts">멀린 1 · 충신 2 · 암살자 1 · 악의 하수인 1<br/>내 역할: {roleNames[game?.role]} · 채점에서 제외</p>
         <form onSubmit={event=>{event.preventDefault();act({type:'ROLE_GUESS',guesses});}}>
-          <div className="guess-players">{game?.ids.filter((id:string)=>id!=='human').map((id:string)=><div className="guess-player" key={id}><span className={`popup-avatar ${id}`}>{name(id).slice(0,1)}</span><label id={`guess-label-${id}`} htmlFor={`guess-${id}`}>{name(id)}</label><Select value={guesses[id]??''} disabled={busy||game.paused} onValueChange={value=>setGuesses(current=>({...current,[id]:value}))}><SelectTrigger id={`guess-${id}`} aria-labelledby={`guess-label-${id}`} className="guess-select"><SelectValue placeholder="역할 선택"/></SelectTrigger><SelectContent className="guess-options">{Object.entries(roleNames).map(([role,label])=><SelectItem key={role} value={role}>{label}</SelectItem>)}</SelectContent></Select></div>)}</div>
+          <div className="guess-players">{game?.ids.filter((id:string)=>id!=='human').map((id:string)=><div className="guess-player" key={id}>
+            <span className={`popup-avatar ${id}`}>{name(id).slice(0,1)}</span><label id={`guess-label-${id}`}>{name(id)}</label>
+            <Select value={guessFactions[id]??''} disabled={busy||game.paused} onValueChange={value=>{setGuessFactions(current=>({...current,[id]:value}));setGuesses(current=>({...current,[id]:''}));}}><SelectTrigger id={`guess-faction-${id}`} aria-label={`${name(id)} 진영`} className="guess-select"><SelectValue placeholder="진영 선택"/></SelectTrigger><SelectContent className="guess-options"><SelectItem value="GOOD">선</SelectItem><SelectItem value="EVIL">악</SelectItem></SelectContent></Select>
+            <Select value={guesses[id]??''} disabled={busy||game.paused||!guessFactions[id]} onValueChange={value=>setGuesses(current=>({...current,[id]:value}))}><SelectTrigger id={`guess-${id}`} aria-label={`${name(id)} 역할`} className="guess-select"><SelectValue placeholder="역할 선택"/></SelectTrigger><SelectContent className="guess-options">{Object.entries(roleNames).filter(([role])=>ROLE_GUIDES[role as keyof typeof ROLE_GUIDES]?.side===guessFactions[id]).map(([role,label])=><SelectItem key={role} value={role}>{label}</SelectItem>)}</SelectContent></Select>
+          </div>)}</div>
           {error&&<p className="guess-error" role="alert">{error}</p>}
           <button className="primary popup-confirm" type="submit" disabled={busy||game?.paused||game?.ids.filter((id:string)=>id!=='human').some((id:string)=>!guesses[id])}>{busy?'추측 저장 중…':'추측 제출'}</button>
         </form>

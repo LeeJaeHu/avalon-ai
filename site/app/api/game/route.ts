@@ -1,16 +1,20 @@
 import {COMPARISON_VERSION,comparisonPreset,comparisonMode} from '../../../lib/comparison.mjs';
+import {fixedGameGeminiConfig,modelHidden} from '../../../lib/gemini-models.mjs';
 import { env } from 'cloudflare:workers';
 import { NextRequest, NextResponse } from 'next/server';
-import { createGame, observe, apply } from '../../../lib/game.mjs';
+import { createGame, observe, apply, newGameHumanRoleMode, syncAssessmentSchedule, ASSESSMENT_SCHEDULE_VERSION } from '../../../lib/game.mjs';
 import { AI_MODEL, AI_POLICY_VERSION, PROMPT_VERSION, decide, idleDueAt, nextAiAction } from '../../../lib/ai.mjs';
 import { gameLog } from '../../../lib/game-log.mjs';
 import {rememberThinking,thinkingDetail} from '../../../lib/thinking-memory.mjs';
+import {ASSESSMENT_VERSION,ASSESSMENT_PROMPT_VERSION,applyAssessment} from '../../../lib/event-assessment.mjs';
 import { rememberAction, ACTION_SELECTION_VERSION } from '../../../lib/action-selection.mjs';
+import { newGameEndgameExposure } from '../../../lib/public-stance.mjs';
+import { newGameDiscussionPolicy, PLAYER_DISCUSSION_VERSION } from '../../../lib/player-discussion.mjs';
 import { ROLE_GUESS_VERSION } from '../../../lib/role-guess.mjs';
 import { loggedDecisionEvidence } from '../../../lib/evidence.mjs';
 import { newGameRoutingMode, routingNotice, ROUTING_VERSION, JEV_MODEL, baselineDiscussion } from '../../../lib/discussion-routing.mjs';
-import { humanNeedsReply } from '../../../lib/conversation.mjs';
-import {gameUsage,recordUsage,acquireAiLease,releaseAiLease} from '../../../lib/usage.mjs';
+import { requiredDiscussionResponse } from '../../../lib/conversation.mjs';
+import {gameUsage,recordUsage,acquireAiLease,releaseAiLease,PRICING} from '../../../lib/usage.mjs';
 
 export const runtime = 'edge';
 const cookie = 'avalon_game';
@@ -28,7 +32,7 @@ function json(value: unknown, status = 200) {
 async function view(game: any) {
   const playerView = observe(game);
   const usage=await gameUsage(env.DB!,game);
-  return { ...playerView,comparisonMode:comparisonMode(game.aiConfig),usage:usage.summary, aiPending: !!nextAiAction(game), idleDueAt: idleDueAt(game), routingMode: game.aiConfig?.routingMode ?? 'baseline', actionMode: game.aiConfig?.actionMode ?? 'gemini' };
+  return { ...playerView,geminiGenerationVersion:game.aiConfig?.geminiGenerationVersion??null,humanRoleMode:game.aiConfig?.humanRoleMode??null,endgameExposureAllowed:game.aiConfig?.endgameExposureAllowed??null,discussionPolicy:game.aiConfig?.discussionPolicy??'moderator',aiModel:modelHidden(game)?null:game.aiConfig?.model??null,comparisonMode:comparisonMode(game.aiConfig),usage:modelHidden(game)?null:usage.summary, aiPending: !!nextAiAction(game), idleDueAt: idleDueAt(game), routingMode: game.aiConfig?.routingMode ?? 'baseline', actionMode: game.aiConfig?.actionMode ?? 'gemini' };
 }
 
 async function readGame(request: NextRequest) {
@@ -37,10 +41,15 @@ async function readGame(request: NextRequest) {
   const row = await env.DB!.prepare('SELECT state FROM games WHERE id = ?').bind(id).first<{ state: string }>();
   if(!row)return null;
   const game=JSON.parse(row.state);
+  if(game.phase!=='ENDED'&&game.aiConfig?.promptVersion&&
+    (game.aiConfig.promptVersion!==PROMPT_VERSION||game.aiConfig.routingVersion!==ROUTING_VERSION||game.aiConfig.policyVersion!==AI_POLICY_VERSION)){
+    game.aiConfig={...game.aiConfig,runtimeChanged:true,currentPromptVersion:PROMPT_VERSION,currentRoutingVersion:ROUTING_VERSION,currentPolicyVersion:AI_POLICY_VERSION};
+  }
   // Existing sessions adopt the manual policy without a destructive restart.
   game.aiConfig={...game.aiConfig,manualProgress:true,conversationVersion:1};
   game.conversation={burst:0,turns:0,revisions:0,...game.conversation,voteAt:null,continueAt:null,deferUntil:null};
   if(game.paused&&game.pauseSource==='reading'){game.paused=false;game.pausedAt=null;game.pauseSource=null;}
+  syncAssessmentSchedule(game);
   return game;
 }
 
@@ -68,7 +77,7 @@ async function recordModelFailure(game: any, actor: string, requestType: string,
   try {
     await env.DB!.prepare('INSERT INTO ai_failures (game_id, state_version, actor, request_type, stage, error_code, policy_version, model, latency_ms, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(game.id, game.version, (error as any)?.actor ?? actor, requestType, stage, code,
-        AI_POLICY_VERSION, AI_MODEL, Date.now() - started, new Date().toISOString()).run();
+        AI_POLICY_VERSION, game.aiConfig?.model??AI_MODEL, Date.now() - started, new Date().toISOString()).run();
   } catch (logError) {
     console.error(JSON.stringify({ event: 'ai_failure_record_failure', message: String(logError) }));
   }
@@ -79,6 +88,7 @@ export async function GET(request: NextRequest) {
     const game = await readGame(request);
     if (new URL(request.url).searchParams.has('diagnostics')) {
       if (!game) return json({ error: '게임이 없습니다.' }, 404);
+      if(modelHidden(game))return json({error:'게임 종료 후 모델 추측을 제출하면 기록을 내려받을 수 있습니다.'},409);
       const [eventRows, failureRows] = await Promise.all([
         env.DB!.prepare('SELECT version, actor, type, at FROM events WHERE game_id = ? ORDER BY version').bind(game.id).all(),
         env.DB!.prepare('SELECT state_version, actor, request_type, stage, error_code, policy_version, model, latency_ms, at FROM ai_failures WHERE game_id = ? ORDER BY at').bind(game.id).all(),
@@ -88,6 +98,7 @@ export async function GET(request: NextRequest) {
         aiConfig: game.aiConfig ? { policyVersion: game.aiConfig.policyVersion, promptVersion: game.aiConfig.promptVersion, model: game.aiConfig.model,
           routingMode: game.aiConfig.routingMode ?? 'baseline', routingVersion: game.aiConfig.routingVersion ?? null,
           actionMode: game.aiConfig.actionMode ?? 'gemini', actionSelectionVersion: game.aiConfig.actionSelectionVersion ?? null,
+          assessmentVersion: game.aiConfig.assessmentVersion ?? null,endgameExposureAllowed:game.aiConfig.endgameExposureAllowed??null,discussionPolicy:game.aiConfig.discussionPolicy??'moderator',
           ...(game.phase === 'ENDED' ? { proposalPolicy: game.aiConfig.proposalPolicy } : {}) } : null,
         events: eventRows.results, aiFailures: failureRows.results,
         ...(game.phase==='ENDED'?{aiThinking:(await gameUsage(env.DB!,game)).records.filter((record:any)=>typeof record.thinking==='string')}: {}) };
@@ -98,6 +109,7 @@ export async function GET(request: NextRequest) {
     }
     if (new URL(request.url).searchParams.has('export')) {
       if (!game) return json({ error: '게임이 없습니다.' }, 404);
+      if(modelHidden(game))return json({error:'게임 종료 후 모델 추측을 제출하면 기록을 내려받을 수 있습니다.'},409);
       if (game.phase !== 'ENDED') return json({ error: '종료된 게임만 내려받을 수 있습니다.' }, 409);
       const log = await gameLog(env.DB!, game);
       return new Response(JSON.stringify(log, null, 2), { headers: {
@@ -119,6 +131,9 @@ export async function POST(request: NextRequest) {
     if (origin && origin !== new URL(request.url).origin) return json({ error: '요청 출처가 맞지 않습니다.' }, 403);
     const body: any = await request.json();
     if (body.type === 'NEW') {
+      let humanRoleMode,endgameExposureAllowed,discussionPolicy;
+      try {humanRoleMode=newGameHumanRoleMode(body.humanRoleMode);endgameExposureAllowed=newGameEndgameExposure(body.endgameExposureAllowed);discussionPolicy=newGameDiscussionPolicy(body.discussionPolicy);}catch(error){return json({error:(error as Error).message},400);}
+      const fixedGeneration=fixedGameGeminiConfig(),model=fixedGeneration.model;
       const preset = body.comparisonMode === undefined ? null : comparisonPreset(body.comparisonMode);
       const routingMode = newGameRoutingMode(preset?.routingMode ?? body.routingMode, defaultRoutingMode());
       const actionMode = preset?.actionMode ?? body.actionMode ?? (routingMode === 'jev' ? 'jev' : 'gemini');
@@ -132,13 +147,17 @@ export async function POST(request: NextRequest) {
           endReason: 'RESTARTED', archivedFromPhase: previous.phase, paused: false };
         await save(previous, archived, 'human', 'GAME_RESTARTED');
       }
-      const game = { ...createGame(), aiConfig: { policyVersion: AI_POLICY_VERSION, promptVersion: PROMPT_VERSION,
+      const game = { ...createGame(Math.random,humanRoleMode), aiConfig: { humanRoleMode, endgameExposureAllowed, discussionPolicy, playerDiscussionVersion:discussionPolicy==='player'?PLAYER_DISCUSSION_VERSION:null, policyVersion: AI_POLICY_VERSION, promptVersion: PROMPT_VERSION,
         comparisonVersion:COMPARISON_VERSION, comparisonMode:comparisonMode({routingMode,actionMode}),
+        modelComparisonVersion:null,
+        pricingVersion:PRICING.version,...fixedGeneration,
         routingMode, routingVersion: ROUTING_VERSION, routingModel: JEV_MODEL,
-        actionMode, actionSelectionVersion: actionMode === 'jev' ? ACTION_SELECTION_VERSION : null, actionModel: actionMode === 'jev' ? JEV_MODEL : AI_MODEL, roleGuessVersion: ROLE_GUESS_VERSION,
+        actionMode, actionSelectionVersion: actionMode === 'jev' ? ACTION_SELECTION_VERSION : null, actionModel: actionMode === 'jev' ? JEV_MODEL : model, roleGuessVersion: ROLE_GUESS_VERSION,
         conversationVersion:1,manualProgress:true,usageTrackingVersion:1,
+        assessmentVersion:modelCredential()?ASSESSMENT_VERSION:null,assessmentScheduleVersion:modelCredential()?ASSESSMENT_SCHEDULE_VERSION:null,
+        assessmentPromptVersion:modelCredential()?ASSESSMENT_PROMPT_VERSION:null,
         proposalPolicy: 'A',
-        model: modelCredential() ? AI_MODEL : null } };
+        model: modelCredential() ? model : null } };
       const at = new Date().toISOString();
       await env.DB!.prepare('INSERT INTO games (id, version, state, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
         .bind(game.id, game.version, JSON.stringify(game), at, at).run();
@@ -174,7 +193,7 @@ export async function POST(request: NextRequest) {
           const current = await readGame(request);
           if (current && current.version !== game.version) { routingOutcome('DISCARDED'); return json({ game: await view(current), aiMode: aiMode() }); }
           stage = 'validation';
-          try { next = apply(game, decision.actor, decision.action); break; }
+          try { next = requestAction.type === 'THINK' ? applyAssessment(game, decision) : apply(game, decision.actor, decision.action); break; }
           catch (error) {
             if (requestAction.type !== 'PROPOSE' || (error as Error).message !== '팀 인원이 맞지 않습니다.' || !modelCredential() || attempt === 2) throw error;
             await recordModelFailure(game, requestAction.actor, requestAction.type, stage, error, started);
@@ -191,12 +210,13 @@ export async function POST(request: NextRequest) {
         const { actor, action, usage, mode, plan } = decision;
         stage = 'save';
         rememberThinking(next,decision);
-        rememberAction(next,decision);
+        rememberAction(next,decision,game);
         await save(game, next, actor, action.type, { aiMode: mode, policyVersion: AI_POLICY_VERSION, promptVersion: PROMPT_VERSION,
           ...(decision.routing ? { routing: decision.routing } : {}), recoveryReason:requestAction.recoveryReason??decision.routing?.recoveryReason??null,
           ...(decision.selection ? { selection: decision.selection } : {}), actionMode: game.aiConfig?.actionMode ?? 'gemini',
+          ...(requestAction.type === 'THINK' ? { eventAssessment: next.privateAssessments[actor] } : {}),
           proposalPolicy: game.aiConfig?.proposalPolicy ?? 'A', ...thinkingDetail(decision), evidence: loggedDecisionEvidence(decision), ...(plan ? { plan } : {}),
-          model: mode === 'gemini' ? AI_MODEL : mode === 'jev' ? JEV_MODEL : null, speechAct: action.type === 'CHAT' && 'speechAct' in action ? action.speechAct : null,
+          model: mode === 'gemini' ? game.aiConfig?.model??AI_MODEL : mode === 'jev' ? JEV_MODEL : null, speechAct: action.type === 'CHAT' && 'speechAct' in action ? action.speechAct : null,
           inputTokens: usage?.input ?? null,
           outputTokens: usage?.output ?? null, latencyMs: usage?.latencyMs ?? null, modelRetries: usage && 'retries' in usage ? usage.retries : 0 });
         routingOutcome('PUBLISHED');
@@ -210,11 +230,19 @@ export async function POST(request: NextRequest) {
         }
         if (stage !== 'save' && modelCredential())
           await recordModelFailure(game, requestAction.actor ?? 'system', requestAction.type, stage, error, started);
+        if (requestAction.type === 'THINK' && stage !== 'save') {
+          const current = await readGame(request);
+          if (current && current.version !== game.version) return json({game:await view(current),aiMode:aiMode()});
+          const failure={actor:requestAction.actor,eventId:requestAction.eventId,sourceVersion:game.version,status:'FAILED',errorCode:(error as any)?.code??'MODEL_ERROR'};
+          const next=applyAssessment(game,failure);
+          await save(game,next,requestAction.actor,'THINK',{eventAssessment:next.privateAssessments[requestAction.actor],aiMode:'fallback',policyVersion:AI_POLICY_VERSION});
+          return json({game:await view(next),aiMode:aiMode(),notice:'AI 상황 판단에 실패해 이번 판단을 생략했습니다. 기존 입력으로 게임을 계속합니다.'});
+        }
         if (requestAction.type === 'DISCUSS' && stage !== 'save') {
           const current = await readGame(request);
           if (current && current.version !== game.version) { routingOutcome('DISCARDED'); return json({ game: await view(current), aiMode: aiMode() }); }
           routingOutcome('GENERATION_FAILURE');
-          const needsFallback=game.aiConfig?.conversationVersion&&(humanNeedsReply(game)||requestAction.recoveryReason);
+          const needsFallback=requiredDiscussionResponse(game)||requestAction.recoveryReason;
           const selected=(error as any)?.actor??routingRecord?.selectedActor;
           const actor=needsFallback?(['ai1','ai2','ai3','ai4'].includes(selected)?selected:baselineDiscussion(game,requestAction).actor):'system';
           const action=needsFallback?{type:'CHAT',text:'응답을 생성하지 못했어요. 현재 공개된 팀과 결과를 기준으로 토론을 이어가겠습니다.',speechAct:'OTHER',replyTo:requestAction.replyTo??null,...(requestAction.idleTrigger?{idleTrigger:true}:{})}:{type:'SILENCE',idleTrigger:true};
@@ -223,7 +251,7 @@ export async function POST(request: NextRequest) {
             ...(routingRecord ? { routing: { ...routingRecord, outcome: 'GENERATION_FAILURE' } } : {}),
             actor: (error as any)?.actor ?? null, expectedType: (error as any)?.expectedType ?? null, returnedType: (error as any)?.returnedType ?? null,
             finishReason: (error as any)?.finishReason ?? null, responseChars: (error as any)?.responseChars ?? null, outputTokens: (error as any)?.outputTokens ?? null });
-          return json({ game: await view(next), aiMode: aiMode(), notice: 'AI 발언에 오류가 있어 이번 발언을 건너뛰었습니다. 게임은 계속 진행됩니다.' });
+          return json({ game: await view(next), aiMode: aiMode(), notice: needsFallback ? 'AI 발언 생성에 오류가 있어 대신 안내를 표시했습니다. 오류와 대체 처리를 기록했습니다.' : 'AI 발언에 오류가 있어 이번 발언을 건너뛰었습니다. 게임은 계속 진행됩니다.' });
         }
         if (stage !== 'save' && requestAction.actor && ['PROPOSE', 'VOTE', 'CARD', 'ASSASSINATE'].includes(requestAction.type)) {
           // Recheck after the failed call: never overwrite a pause, chat, or newer action.
@@ -231,7 +259,7 @@ export async function POST(request: NextRequest) {
           if (current && current.version !== game.version) return json({ game: await view(current), aiMode: aiMode() });
           const fallback = await decide(game, requestAction, null,null,{practiceOnly:true});
           const next = apply(game, fallback.actor, fallback.action);
-          rememberAction(next,{...fallback,mode:'fallback'});
+          rememberAction(next,{...fallback,mode:'fallback'},game);
           await save(game, next, fallback.actor, fallback.action.type, { aiMode: 'fallback', reason: 'MODEL_FAILURE',
             evidence: loggedDecisionEvidence({ ...fallback, mode: 'fallback' }), errorCode: (error as { code?: string })?.code ?? 'INVALID_ACTION', policyVersion: AI_POLICY_VERSION, promptVersion: PROMPT_VERSION });
           return json({ game: await view(next), aiMode: aiMode(), notice: 'AI 요청에 실패해 이번 행동은 기본 규칙으로 처리했습니다. 기록에 오류와 대체 처리를 남겼습니다.' });
@@ -239,7 +267,7 @@ export async function POST(request: NextRequest) {
         throw error;
       }
     }
-    if (!['START', 'PAUSE', 'RESUME', 'CHAT', 'PROPOSE', 'START_VOTE', 'REQUEST_REVISION', 'VOTE', 'CARD', 'CONTINUE', 'ASSASSINATE','DEFER_VOTE','HUMAN_ACTIVE','ROLE_GUESS'].includes(body.type)) return json({ error: '허용되지 않는 행동입니다.' }, 400);
+    if (!['START', 'PAUSE', 'RESUME', 'CHAT', 'PROPOSE', 'START_VOTE', 'REQUEST_REVISION', 'VOTE', 'CARD', 'CONTINUE', 'ASSASSINATE','DEFER_VOTE','HUMAN_ACTIVE','ROLE_GUESS','MODEL_GUESS'].includes(body.type)) return json({ error: '허용되지 않는 행동입니다.' }, 400);
     if(body.type==='HUMAN_ACTIVE'&&(!game.aiConfig?.conversationVersion||!['PROPOSE','TEAM_DISCUSSION','VOTE_RESULT','QUEST_RESULT'].includes(game.phase)))return json({game:await view(game),aiMode:aiMode()});
     if (body.type === 'CHAT') {
       const text = String(body.text ?? '').trim();
@@ -250,7 +278,7 @@ export async function POST(request: NextRequest) {
       return json({ game: await view(next), aiMode: aiMode() });
     }
     const next = apply(game, 'human', body);
-    await save(game, next, 'human', body.type, body.type === 'ROLE_GUESS' ? { roleGuess: next.roleGuess } : {});
+    await save(game, next, 'human', body.type, body.type === 'ROLE_GUESS' ? { roleGuess: next.roleGuess } : body.type==='MODEL_GUESS'?{modelGuess:next.modelGuess}:{});
     return json({ game: await view(next), aiMode: aiMode() });
   } catch (error) {
     if ((error as { code?: string })?.code === 'STALE_STATE') {

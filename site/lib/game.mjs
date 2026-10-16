@@ -1,20 +1,41 @@
 import { progressOptions,GRACE_MS,manualNextStep } from './conversation.mjs';
 import { roleGuessPending, submitRoleGuess } from './role-guess.mjs';
 import { publicRoleCounts } from './role-guide.mjs';
+import {isBlindModel,modelHidden,modelGuessPending,submitModelGuess} from './gemini-models.mjs';
 export const IDS = ['human', 'ai1', 'ai2', 'ai3', 'ai4'];
 export const NAMES = { human: '유저', ai1: '하린', ai2: '도윤', ai3: '서아', ai4: '지호' };
 export const SIZES = [2, 3, 2, 3, 3];
 export const ROLES = ['MERLIN', 'LOYAL', 'LOYAL', 'ASSASSIN', 'MINION'];
 export const SPEECH_ACTS = ['QUESTION', 'ANSWER', 'TEAM_SUGGESTION', 'CHALLENGE', 'DEFENSE', 'EVIDENCE', 'OTHER'];
+export const ASSESSMENT_SCHEDULE_VERSION = 'leader-before-team-v2';
+export function syncAssessmentSchedule(game) {
+  if (game.aiConfig?.assessmentVersion !== 'event-assessment-v1' || game.phase === 'ENDED') return game;
+  game.aiConfig.assessmentScheduleVersion = ASSESSMENT_SCHEDULE_VERSION;
+  if (game.pendingAssessment?.kind === 'QUEST_RESULT') game.pendingAssessment.actors = [];
+  if (game.pendingAssessment?.kind === 'TEAM') game.pendingAssessment.actors = game.pendingAssessment.actors.filter(id => id !== game.leader);
+  if (game.leader !== 'human' && (game.phase === 'PROPOSE' || game.revisionRequested)) {
+    if (game.revisionRequested) game.revisionAssessmentId ??= `legacy-revision:${game.version}`;
+    const eventId = `before-propose:${game.quest}:${game.attempt}:${game.revisionRequested ? game.revisionAssessmentId : 'initial'}`;
+    if (game.privateAssessments?.[game.leader]?.eventId !== eventId)
+      game.pendingAssessment = { eventId, kind: 'BEFORE_PROPOSE', actors: [game.leader] };
+  }
+  return game;
+}
 const evil = role => role === 'ASSASSIN' || role === 'MINION';
 const requireThat = (ok, message) => { if (!ok) throw new Error(message); };
 
-export function createGame(random = Math.random) {
-  const shuffled = [...ROLES];
+export function newGameHumanRoleMode(mode = 'loyal-fixed') {
+  if (!['loyal-fixed', 'random'].includes(mode)) throw new Error('사용자 역할 배정 방식을 확인해 주세요.');
+  return mode;
+}
+export function createGame(random = Math.random, humanRoleMode = 'random') {
+  newGameHumanRoleMode(humanRoleMode);
+  const shuffled = humanRoleMode === 'loyal-fixed' ? ['MERLIN', 'LOYAL', 'ASSASSIN', 'MINION'] : [...ROLES];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
+  if (humanRoleMode === 'loyal-fixed') shuffled.unshift('LOYAL');
   return { id: crypto.randomUUID(), version: 0, phase: 'ROLE_REVEAL', quest: 0, attempt: 1,
     leader: IDS[Math.floor(random() * 5)], roles: Object.fromEntries(IDS.map((id, i) => [id, shuffled[i]])),
     proposals: [], quests: [], messages: [], team: null, votes: {}, cards: {}, privateCards: [], winner: null, paused: false, pausedAt: null,
@@ -34,22 +55,24 @@ export function observe(game, actor = 'human') {
       ? { id: p.id, quest: p.quest, attempt: p.attempt, leader: p.leader, team: p.team, status: p.status }
       : p), quests: game.quests, messages: game.messages,
     voted: Object.hasOwn(game.votes, actor), cardSubmitted: Object.hasOwn(game.cards, actor),
-    winner: game.winner, paused: !!game.paused,pausedAt:game.pausedAt??null,pauseSource:game.pauseSource??'manual',
+    winner: game.winner, assessmentPending: !!game.pendingAssessment?.actors?.length, paused: !!game.paused,pausedAt:game.pausedAt??null,pauseSource:game.pauseSource??'manual',
     currentProposalId: current?.id ?? null,
     ...(game.aiConfig?.conversationVersion?{conversation:{voteAt:game.conversation?.voteAt??null,continueAt:game.conversation?.continueAt??null,burst:game.conversation?.burst??0},conversationVersion:1}:{}) };
   if (actor === 'human' && game.aiConfig?.roleGuessVersion) view.roleGuess = game.phase === 'ENDED' ? (game.roleGuess ?? null) : { pending: roleGuessPending(game), submitted: !!game.roleGuess };
   if (game.phase === 'ENDED') view.roles = game.roles;
+  if(actor==='human'&&isBlindModel(game))view.modelGuess={hidden:modelHidden(game),pending:modelGuessPending(game),submitted:!!game.modelGuess,...(game.modelGuess??{})};
   if (game.phase === 'ENDED' && game.assassination) view.assassination = game.assassination;
   return view;
 }
 
 export function observeModerator(game) {
-  const { role, known, roles, voted, cardSubmitted, roleGuess, ...publicView } = observe(game);
+  const { role, known, roles, voted, cardSubmitted, roleGuess, modelGuess, ...publicView } = observe(game);
   return publicView;
 }
 
 export function apply(game, actor, action) {
   const type = action?.type;
+  if(type==='MODEL_GUESS')return {...structuredClone(game),modelGuess:submitModelGuess(game,actor,action.choice),version:game.version+1};
   if(game.aiConfig?.manualProgress&&['ANNOUNCE_VOTE','ANNOUNCE_CONTINUE'].includes(type))throw new Error('다음 단계는 버튼으로 이동해 주세요.');
   if(game.aiConfig?.manualProgress&&['START_VOTE','CONTINUE'].includes(type)) {
     const step=manualNextStep(game);
@@ -67,7 +90,10 @@ export function apply(game, actor, action) {
   }
   const event = (kind, text) => {
     next.publicEvents ??= [];
-    next.publicEvents.push({ id: `event-${next.version + 1}`, kind, text, at: new Date().toISOString(), version: next.version + 1 });
+    next.publicEvents.push({ id: `event-${next.version + 1}`, kind, text, at: new Date().toISOString(), version: next.version + 1,
+      ...(kind === 'TEAM' ? { messageCount: next.messages.length } : {}) });
+    if (next.aiConfig?.assessmentVersion === 'event-assessment-v1' && kind === 'TEAM')
+      next.pendingAssessment = { eventId: `event-${next.version + 1}`, kind, actors: IDS.slice(1).filter(id => id !== next.leader) };
   };
   if (type === 'PAUSE') {
     if(actor==='human'&&action.readingAuto&&next.paused)return game;
@@ -136,6 +162,7 @@ export function apply(game, actor, action) {
     if(facilitated)c.burst=3;
   } else if (type === 'PROPOSE') {
     requireThat(['PROPOSE', 'TEAM_DISCUSSION'].includes(next.phase) && next.leader === actor, '지금 팀을 제안할 수 없습니다.');
+    requireThat(!(next.pendingAssessment?.kind === 'BEFORE_PROPOSE' && next.pendingAssessment.actors.length), '리더의 상황 판단을 먼저 마쳐 주세요.');
     requireThat(Array.isArray(action.team) && action.team.length === SIZES[next.quest]
       && new Set(action.team).size === action.team.length && action.team.every(id => IDS.includes(id)), '팀 인원이 맞지 않습니다.');
     next.team = [...action.team]; next.votes = {};
@@ -154,6 +181,7 @@ export function apply(game, actor, action) {
     next.revisionRequested = true;
     next.pendingDiscussion=null;next.pendingSpeech=null;if(facilitated){c.revisions++;c.voteAt=null;}
     event('DISCUSSION', `${NAMES[next.leader]}에게 대화를 바탕으로 팀 재검토를 요청했습니다.`);
+    next.revisionAssessmentId = `revision:${next.version + 1}`;
   } else if (type === 'START_VOTE') {
     requireThat((actor==='human'||(actor==='system'&&c?.voteAt&&Date.now()>=c.voteAt)) && next.phase === 'TEAM_DISCUSSION' && !next.revisionRequested, '지금 투표를 시작할 수 없습니다.');
     if(facilitated){c.voteAt=null;c.deferUntil=null;c.burst=0;}
@@ -216,5 +244,6 @@ export function apply(game, actor, action) {
   if (type === 'CHAT' || type === 'SILENCE' || next.phase !== game.phase || next.quest !== game.quest || next.attempt !== game.attempt)
     next.lastDiscussionAt = new Date().toISOString();
   next.version++;
+  syncAssessmentSchedule(next);
   return next;
 }

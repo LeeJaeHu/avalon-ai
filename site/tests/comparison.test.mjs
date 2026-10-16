@@ -41,3 +41,30 @@ test('동일한 투표 관찰에서 Gemini 단독과 혼합은 지정한 행동 
     assert.equal(two.mode,'jev');assert.equal(jevCalls,1);assert.equal(calls.length,0);
   }finally{globalThis.fetch=original;}
 });
+
+test('진영/세부 채점을 분리하고 시작 역할·종료 경로별 분모와 과거 미확인을 보존한다',()=>{
+ const a=log('faction'),b=log('evil','hybrid'),legacy=log('missing');
+ a.game.roles={human:'LOYAL',ai1:'MERLIN',ai2:'LOYAL',ai3:'ASSASSIN',ai4:'MINION'};
+ a.game.roleGuess={correct:0,total:4,guesses:{ai1:'LOYAL',ai2:'MERLIN',ai3:'MINION',ai4:'ASSASSIN'},checkpoint:'FIVE_REJECTIONS'};
+ b.game.roles={human:'ASSASSIN',ai1:'MERLIN',ai2:'LOYAL',ai3:'LOYAL',ai4:'MINION'};
+ b.game.roleGuess={correct:2,total:4,guesses:{ai1:'MINION',ai2:'LOYAL',ai3:'LOYAL',ai4:'MERLIN'},checkpoint:'THREE_SUCCESSES'};
+ const r=compareModelLogs([a,b,legacy]);
+ assert.equal(r.byMode.gemini.guessAccuracy,3/8);assert.equal(r.byMode.gemini.factionGuessAccuracy,1);
+ assert.equal(r.byMode.gemini.factionGuessGames,1);assert.equal(r.byMode.gemini.factionGuessTotal,4);
+ assert.equal(r.byHumanRole.LOYAL.byMode.gemini.completedGames,2);
+ assert.equal(r.byHumanRole.ASSASSIN.byMode.hybrid.guessAccuracy,.5);assert.equal(r.byHumanRole.ASSASSIN.byMode.hybrid.factionGuessAccuracy,.5);
+ assert.equal(r.byHumanRole.MERLIN.byMode.hybrid.guessAccuracy,null);
+ assert.equal(r.byCheckpoint.FIVE_REJECTIONS.byMode.gemini.guessAccuracy,0);
+ assert.equal(r.byCheckpoint['legacy-unknown'].byMode.gemini.factionGuessAccuracy,null);
+ assert.equal(r.games.find(g=>g.gameId==='missing').factionGuessTotal,null);
+});
+
+ test('막판 정체 노출 설정은 로그 비교 조건에서 ON/OFF/미기록을 구분한다',()=>{
+  const logs=[log('off'),log('on'),log('legacy')];logs[0].game.aiConfig.endgameExposureAllowed=false;logs[1].game.aiConfig.endgameExposureAllowed=true;
+  const result=compareModelLogs(logs);assert.deepEqual(result.games.map(r=>r.conditions.endgameExposureAllowed),[false,true,null]);
+ });
+
+test('개인/진행자 발언 판단 조건을 구분하고 구판은 진행자 방식으로 해석한다',()=>{
+  const logs=[log('player'),log('moderator'),log('legacy')];logs[0].game.aiConfig.discussionPolicy='player';logs[1].game.aiConfig.discussionPolicy='moderator';
+  assert.deepEqual(compareModelLogs(logs).games.map(r=>r.conditions.discussionPolicy),['player','moderator','moderator']);
+});

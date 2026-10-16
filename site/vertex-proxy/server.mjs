@@ -2,8 +2,7 @@ import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 
 const project = 'project-c1511084-5489-4d98-8db';
-const model = 'gemini-3.5-flash-lite';
-const vertexUrl = `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`;
+export const allowedModels=['gemini-3.5-flash-lite','gemini-3.5-flash'];
 const secret = process.env.VERTEX_PROXY_TOKEN;
 if (!secret || secret.length < 32) throw new Error('VERTEX_PROXY_TOKEN is required');
 let cachedToken;
@@ -25,7 +24,7 @@ async function accessToken() {
   return cachedToken.value;
 }
 
-createServer(async (request, response) => {
+export const server=createServer(async (request, response) => {
   if (request.method !== 'POST' || request.url !== '/generate') {
     response.writeHead(404).end();
     return;
@@ -41,6 +40,11 @@ createServer(async (request, response) => {
       if (body.length > 65536) { response.writeHead(413).end(); return; }
     }
     const input = JSON.parse(body);
+    const model=input.model??allowedModels[0];
+    if (!allowedModels.includes(model)) {response.writeHead(400).end();return;}
+    const thinkingLevel=input.generationConfig?.thinkingConfig?.thinkingLevel;
+    if(thinkingLevel!==undefined&&!['MINIMAL','LOW','MEDIUM','HIGH'].includes(thinkingLevel)){response.writeHead(400).end();return;}
+    const vertexUrl = `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`;
     if (input.contents?.length !== 1 || input.contents[0]?.role !== 'user'
       || input.contents[0]?.parts?.length !== 1 || typeof input.contents[0].parts[0]?.text !== 'string'
       || input.contents[0].parts[0].text.length > 30000) {
@@ -49,7 +53,8 @@ createServer(async (request, response) => {
     }
     const payload = { contents: input.contents, generationConfig: {
       responseMimeType: 'application/json', temperature: input.generationConfig?.temperature ?? 0.7,
-      maxOutputTokens: Math.min(1024, Math.max(300, Number(input.generationConfig?.maxOutputTokens) || 300)),
+      maxOutputTokens: Math.min(8192, Math.max(300, Number(input.generationConfig?.maxOutputTokens) || 300)),
+      ...(thinkingLevel?{thinkingConfig:{thinkingLevel}}:{}),
       ...(input.generationConfig?.responseSchema ? { responseSchema: input.generationConfig.responseSchema } : {}) } };
     const upstream = await fetch(vertexUrl, { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await accessToken()}` },

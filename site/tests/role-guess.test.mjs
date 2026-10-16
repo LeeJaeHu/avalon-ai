@@ -9,7 +9,7 @@ const correct={ai1:'MERLIN',ai2:'LOYAL',ai3:'ASSASSIN',ai4:'MINION'};
 test('세 번째 성공/실패에서 추측 전 진행 차단, 점수는 종료 후에만 공개한다',()=>{
  for(const result of ['SUCCESS','FAIL']){let g=setup(result);assert.ok(roleGuessPending(g));assert.equal(nextAiAction(g),null);assert.equal(manualNextStep(g).disabled,true);
   assert.throws(()=>apply(g,'human',{type:'CONTINUE'}));assert.throws(()=>apply(g,'human',{type:'CHAT',text:'계속',speechAct:'OTHER'}));
-  g=apply(g,'human',{type:'ROLE_GUESS',guesses:correct});assert.equal(g.roleGuess.correct,4);assert.equal(g.roleGuess.total,4);assert.equal(g.roleGuess.humanRole,'LOYAL');
+  g=apply(g,'human',{type:'ROLE_GUESS',guesses:correct});assert.equal(g.roleGuess.correct,4);assert.equal(g.roleGuess.total,4);assert.equal(g.roleGuess.factionCorrect,4);assert.equal(g.roleGuess.factionTotal,4);assert.equal(g.roleGuess.humanRole,'LOYAL');
   assert.deepEqual(observe(g).roleGuess,{pending:false,submitted:true});assert.ok(!Object.hasOwn(observe(g,'ai1'),'roleGuess'));assert.ok(!Object.hasOwn(observeModerator(g),'roleGuess'));assert.throws(()=>apply(g,'human',{type:'ROLE_GUESS',guesses:correct}));
   g=apply(g,'system',{type:'SILENCE',idleTrigger:true});g=apply(g,'human',{type:'CONTINUE'});
   if(result==='SUCCESS'){assert.equal(g.phase,'ASSASSINATE');assert.ok(!Object.hasOwn(observe(g),'roles'));assert.ok(!JSON.stringify(actionPayload(g,{actor:'ai3',type:'ASSASSINATE'})).includes('roleGuess'));
@@ -19,7 +19,9 @@ test('세 번째 성공/실패에서 추측 전 진행 차단, 점수는 종료 
 });
 
 test('부분·전부 오답을 정확히 계산하고 잘못된 입력·역할 수·시점·AI 제출은 거부한다',()=>{
- const g=setup();for(const [guesses,count] of [[{ai1:'LOYAL',ai2:'MERLIN',ai3:'MINION',ai4:'ASSASSIN'},0],[{ai1:'MERLIN',ai2:'LOYAL',ai3:'MINION',ai4:'ASSASSIN'},2]])assert.equal(apply(g,'human',{type:'ROLE_GUESS',guesses}).roleGuess.correct,count);
+ const g=setup();for(const [guesses,count,factionCount] of [[{ai1:'LOYAL',ai2:'MERLIN',ai3:'MINION',ai4:'ASSASSIN'},0,4],[{ai1:'MERLIN',ai2:'LOYAL',ai3:'MINION',ai4:'ASSASSIN'},2,4],[{ai1:'ASSASSIN',ai2:'LOYAL',ai3:'MERLIN',ai4:'MINION'},2,2]]){
+  const score=apply(g,'human',{type:'ROLE_GUESS',guesses}).roleGuess;assert.equal(score.correct,count);assert.equal(score.factionCorrect,factionCount);
+ }
  for(const guesses of [null,[],{}, {...correct,ai1:'UNKNOWN'}, {...correct,ai2:'MERLIN'}, {...correct,human:'LOYAL'}])assert.throws(()=>apply(g,'human',{type:'ROLE_GUESS',guesses}));
  assert.throws(()=>apply(g,'ai1',{type:'ROLE_GUESS',guesses:correct}));
  for(const altered of [{...g,quests:g.quests.slice(0,2)},{...g,phase:'VOTE_RESULT'},{...g,aiConfig:{}}]){assert.equal(roleGuessPending(altered),false);assert.throws(()=>apply(altered,'human',{type:'ROLE_GUESS',guesses:correct}));}
@@ -31,4 +33,19 @@ test('제출 후 새로고침에서도 정답을 숨기고 종료 로그에 버�
  assert.deepEqual(observe(restored).roleGuess,{pending:false,submitted:true});assert.equal(restored.roleGuess.aiConfig.policyVersion,'test');
  const db={prepare:()=>({bind(){return this;},async all(){return {results:[]};}})};
  const log=await gameLog(db,{...restored,phase:'ENDED'});assert.equal(log.roleGuess.correct,4);assert.equal(log.roleGuess.total,IDS.length-1);assert.equal(log.roleGuess.metricVersion,ROLE_GUESS_VERSION);
+ assert.equal(log.roleGuess.factionCorrect,4);assert.equal(log.roleGuess.factionTotal,4);assert.equal(log.roleGuess.checkpoint,'THREE_SUCCESSES');
+});
+
+test('5번째 실제 부결 투표는 추측을 기다리고 제출·복원 후 악 승리로 종료한다',()=>{
+ let g={...setup(),phase:'VOTE',attempt:5,quests:[],team:['human','ai1'],votes:{},proposals:[{id:'p5',quest:1,attempt:5,team:['human','ai1'],status:'DRAFT'}],pendingDiscussion:null};
+ for(const actor of IDS)g=apply(g,actor,{type:'VOTE',choice:'REJECT'});
+ assert.equal(g.phase,'VOTE_RESULT');assert.ok(roleGuessPending(g));assert.equal(nextAiAction(g),null);assert.equal(manualNextStep(g).disabled,true);
+ assert.throws(()=>apply(g,'human',{type:'CONTINUE'}));assert.throws(()=>apply(g,'system',{type:'CONTINUE'}));
+ assert.deepEqual(observe(g).roleGuess,{pending:true,submitted:false});assert.ok(!Object.hasOwn(observe(g),'roles'));
+ assert.ok(!Object.hasOwn(observeModerator(g),'roleGuess'));
+ g=JSON.parse(JSON.stringify(apply(g,'human',{type:'ROLE_GUESS',guesses:correct})));
+ assert.equal(g.roleGuess.checkpoint,'FIVE_REJECTIONS');assert.deepEqual(observe(g).roleGuess,{pending:false,submitted:true});
+ g=apply(g,'system',{type:'SILENCE',idleTrigger:true});g=apply(g,'human',{type:'CONTINUE'});
+ assert.equal(g.phase,'ENDED');assert.equal(g.winner,'EVIL');assert.equal(observe(g).roleGuess.factionCorrect,4);
+ for(const altered of [{...setup(),phase:'VOTE_RESULT',attempt:4,proposals:[{status:'REJECTED'}]},{...setup(),phase:'VOTE_RESULT',attempt:5,proposals:[{status:'APPROVED'}]}])assert.equal(roleGuessPending(altered),false);
 });

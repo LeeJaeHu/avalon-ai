@@ -67,7 +67,8 @@ test('공개 사건은 전원 투표 결과만 포함하며 개별 임무 카드
   game=apply(game,'ai1',{type:'CARD',choice:'SUCCESS'});
   assert.equal(game.phase,'QUEST_RESULT');
   assert.match(game.publicEvents.at(-1).text,/실패 카드 0장/);
-  assert.ok(game.publicEvents.every(e=>Object.keys(e).sort().join(',')==='at,id,kind,text,version'));
+  assert.ok(game.publicEvents.every(e=>Object.keys(e).sort().join(',')===(e.kind==='TEAM'?'at,id,kind,messageCount,text,version':'at,id,kind,text,version')));
+  assert.ok(game.publicEvents.filter(e=>e.kind==='TEAM').every(e=>Number.isSafeInteger(e.messageCount)&&e.messageCount>=0&&e.messageCount<=game.messages.length));
   const publicText=JSON.stringify(observe(game).publicEvents);
   for(const field of ['roles','privateCards','MERLIN','ASSASSIN','MINION','LOYAL'])assert.equal(publicText.includes(field),false);
   assert.equal(nextAiAction(game),null);

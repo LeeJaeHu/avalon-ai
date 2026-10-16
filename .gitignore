@@ -16,3 +16,9 @@ prototype/.env*
 .local-prototype/
 
 /아발론_프롬프트_작성중.txt
+
+# 계정 ID·D1 ID가 들어 있는 실제 배포 설정. 예시는 site/wrangler.cloudflare.example.jsonc
+site/wrangler.cloudflare.jsonc
+# Wrangler 계정 캐시와 site 안의 중복 스펙 사본
+.wrangler/
+site/docs/

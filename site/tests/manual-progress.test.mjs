@@ -50,7 +50,7 @@ test('JEV WAIT 및 장애에서도 질문에 답하고 수동 선택으로 전�
   let g=setup(),jevCalls=0;const choice=(keys,selected)=>({type:'choice',choice:selected,confidence:1,probabilities:Object.fromEntries(keys.map(k=>[k,k===selected?1:0]))});
   globalThis.fetch=async(url,init)=>{
    const body=JSON.parse(init.body);
-   if(url.includes('typesafe')){jevCalls++;assert.ok(!body.questions.progress);if(failure)throw Error('mock-network');return Response.json({model:JEV_MODEL,usage:{input_tokens:1000},answers:{responder:choice(['ai1','ai2','ai3','ai4','WAIT'],'WAIT'),speechAct:choice(SPEECH_ACTS,'ANSWER')}});}
+   if(url.includes('typesafe')){jevCalls++;assert.ok(!body.questions.progress);if(failure)throw Error('mock-network');return Response.json({model:JEV_MODEL,usage:{input_tokens:1000},answers:{responder:choice(['ai1','ai2','ai3','ai4'],'ai2'),discussion:choice(['TALK','WAIT'],'WAIT')}});}
    const prompt=body.contents[0].parts[0].text,r=JSON.parse(prompt.split('이번 요청은 다음과 같습니다.')[1].trim().split('\n')[0]);
    const action=r.type==='CHAT'?{type:'CHAT',text:'도윤을 포함해 실패 팀과 한 명씩 비교하겠습니다.',speechAct:'ANSWER'}:r.type==='PROPOSE'?{type:'PROPOSE',team:IDS.slice(0,r.requiredTeamSize)}:r.type==='VOTE'?{type:'VOTE',choice:'APPROVE'}:r.type==='CARD'?{type:'CARD',choice:'SUCCESS'}:{type:'ASSASSINATE',target:IDS.find(id=>id!==r.actor)};
    return Response.json({usageMetadata:{promptTokenCount:100,candidatesTokenCount:20},candidates:[{content:{parts:[{text:JSON.stringify({...action,thinking:'모의 자기보고'})}]}}]});

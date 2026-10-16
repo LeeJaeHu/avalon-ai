@@ -55,7 +55,7 @@ test('5인/7인 팀 후보는 모든 합법 조합이며 JEV 라우터는 의도
   assert.equal(teamCombinations(IDS,2).length,10);for(const [n,count] of [[2,21],[3,35],[4,35]])assert.equal(teamCombinations(['a','b','c','d','e','f','g'],n).length,count);
   const g=fixture();g.phase='TEAM_DISCUSSION';g.pendingDiscussion='followup';g.messages=[{id:'m',actor:'ai1',text:'다른 의견은?',replyTo:null}];
   const result=await routeDiscussion(g,{type:'DISCUSS',replyTo:'m'},{mode:'jev',key:'mock',fetchImpl:async(url,init)=>{
-    assert.deepEqual(Object.keys(JSON.parse(init.body).questions),['responder']);return Response.json({model:JEV_MODEL,usage:{input_tokens:100},answers:{responder:{type:'choice',choice:'WAIT',confidence:1,probabilities:{ai1:0,ai2:0,ai3:0,ai4:0,WAIT:1}}}});
+    assert.deepEqual(Object.keys(JSON.parse(init.body).questions),['discussion','responder']);return Response.json({model:JEV_MODEL,usage:{input_tokens:100},answers:{responder:{type:'choice',choice:'ai2',confidence:1,probabilities:{ai1:0,ai2:1,ai3:0,ai4:0}},discussion:{type:'choice',choice:'WAIT',confidence:1,probabilities:{TALK:0,WAIT:1}}}});
   }});assert.equal(result.record.status,'OK');assert.equal(result.actor,'WAIT');
 });
 

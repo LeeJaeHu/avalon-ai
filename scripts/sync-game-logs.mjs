@@ -11,10 +11,17 @@ export async function syncOnce(config, root = project, fetcher = fetch) {
   if (origin.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(origin.hostname)) throw new Error('INVALID_ORIGIN');
   if (!config.token) throw new Error('MISSING_CREDENTIAL');
   const settings = join(resolve(root), '.log-sync');
-  const directory = join(resolve(root), 'logs');
+  let collection = null;
+  try { collection = JSON.parse(await readFile(join(settings, 'collection.json'), 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (collection && (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(collection.directory ?? '')
+    || !Array.isArray(collection.excludedGameIds) || collection.excludedGameIds.some(id => !uuid.test(id)))) throw new Error('INVALID_COLLECTION');
+  const directory = join(resolve(root), 'logs', collection?.directory ?? '');
+  const excluded = new Set(collection?.excludedGameIds ?? []);
+  const manifestPath = join(settings, collection ? `manifest-${collection.directory}.json` : 'manifest.json');
   await mkdir(settings, { recursive: true });
   let manifest = {};
-  try { manifest = JSON.parse(await readFile(join(settings, 'manifest.json'), 'utf8')); }
+  try { manifest = JSON.parse(await readFile(manifestPath, 'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const get = async query => {
     const url = new URL('/api/logs', origin);
@@ -37,13 +44,21 @@ export async function syncOnce(config, root = project, fetcher = fetch) {
     for (const row of page.games) {
       if (!uuid.test(row.id) || !Number.isInteger(row.version)) throw new Error('INVALID_GAME');
       total++;
-      const revision = `${row.version}:${row.updated_at}:${row.failure_id}`;
+      if (excluded.has(row.id)) continue;
+      const revision = `${row.version}:${row.updated_at}:${row.failure_id}:${row.usage_revision??'legacy'}`;
       const file = join(directory, `avalon-${row.id}.json`);
       let exists = false;
       try { await access(file); exists = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
-      if (manifest[row.id] === revision && exists) continue;
+      // Older servers cannot signal late usage updates; refresh their selected logs.
+      if (row.usage_revision != null && manifest[row.id] === revision && exists) continue;
       const log = await get(`id=${row.id}`);
       if (log.game?.id !== row.id || log.game?.phase !== 'ENDED') throw new Error('INVALID_LOG');
+      if (exists) {
+        const previous = JSON.parse(await readFile(file, 'utf8'));
+        const { exportedAt: previousAt, ...previousData } = previous;
+        const { exportedAt: currentAt, ...currentData } = log;
+        if (JSON.stringify(previousData) === JSON.stringify(currentData)) { manifest[row.id] = revision; continue; }
+      }
       if (!(await saveGameLog(directory, log)).saved) throw new Error('OLD_LOG');
       manifest[row.id] = revision;
       saved++;
@@ -52,10 +67,10 @@ export async function syncOnce(config, root = project, fetcher = fetch) {
     if (after && !uuid.test(after)) throw new Error('INVALID_CURSOR');
   } while (after);
   // Persist revisions only after successful file writes; retries cannot skip unsaved records.
-  const temporary = join(settings, 'manifest.json.tmp');
+  const temporary = manifestPath + '.tmp';
   await writeFile(temporary, JSON.stringify(manifest));
-  await rename(temporary, join(settings, 'manifest.json'));
-  return { total, saved };
+  await rename(temporary, manifestPath);
+  return { total, saved, directory };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

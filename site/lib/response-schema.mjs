@@ -3,7 +3,7 @@ import { evidenceReferenceIds } from './evidence.mjs';
 
 export function responseSchema(request, view, referenceIds = evidenceReferenceIds(view, view)) {
   const fields = {
-    type: { type: 'STRING', enum: request.type === 'CHAT' ? ['CHAT', 'SILENCE'] : [request.type] },
+    type: { type: 'STRING', enum: request.type === 'CHAT' && !request.requiredResponse ? ['CHAT', 'SILENCE'] : [request.type] },
     thinking: { type: 'STRING' },
     evidence: { type: 'OBJECT', properties: {
       summary: { type: 'STRING', description: '선택에 대한 1~2문장, 240자 이하의 짧은 설명. 상세 추론은 제외.' },
@@ -19,5 +19,5 @@ export function responseSchema(request, view, referenceIds = evidenceReferenceId
   if (request.type === 'VOTE') fields.choice = { type: 'STRING', enum: ['APPROVE', 'REJECT'] };
   if (request.type === 'CARD') fields.choice = { type: 'STRING', enum: ['MERLIN', 'LOYAL'].includes(view.role) ? ['SUCCESS'] : ['SUCCESS', 'FAIL'] };
   if (request.type === 'ASSASSINATE') fields.target = { type: 'STRING', enum: IDS.filter(id => id !== request.actor) };
-  return { type: 'OBJECT', properties: fields, required: request.type === 'CHAT' ? ['type', 'evidence'] : ['type', ...Object.keys(fields).filter(key => !['type', 'thinking'].includes(key))] };
+  return { type: 'OBJECT', properties: fields, required: request.type === 'CHAT' ? ['type', 'evidence', ...(request.requiredResponse ? ['text', 'speechAct'] : [])] : ['type', ...Object.keys(fields).filter(key => !['type', 'thinking'].includes(key))] };
 }

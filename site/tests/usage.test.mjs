@@ -1,5 +1,5 @@
 import test from'node:test';import assert from'node:assert/strict';import{DatabaseSync}from'node:sqlite';import{readFileSync}from'node:fs';
-import{geminiUsage,usageSummary,recordUsage,gameUsage,acquireAiLease,releaseAiLease}from'../lib/usage.mjs';
+import{geminiUsage,usageSummary,recordUsage,gameUsage,acquireAiLease,releaseAiLease,modelUsageRevision}from'../lib/usage.mjs';
 import{createGame,apply}from'../lib/game.mjs';import{decide}from'../lib/ai.mjs';
 function database(){const sqlite=new DatabaseSync(':memory:');sqlite.exec(readFileSync(new URL('../drizzle/0002_conversation_usage.sql',import.meta.url),'utf8'));return{prepare:sql=>({bind:(...values)=>({run:async()=>sqlite.prepare(sql).run(...values),first:async()=>sqlite.prepare(sql).get(...values),all:async()=>({results:sqlite.prepare(sql).all(...values)})})}),close:()=>sqlite.close()};}
 test('Gemini 캐시·응답·추론 사용량과 미확인·모델 경계를 계산한다',()=>{
@@ -26,4 +26,9 @@ test('동시 요청은 판별 임대 하나만 허용, 만료와 소유자 확�
  await releaseAiLease(db,g.id,'wrong-owner');assert.equal(await acquireAiLease(db,g,101),null);
  await releaseAiLease(db,g.id,owners.find(Boolean));assert.ok(await acquireAiLease(db,g,102));assert.ok(await acquireAiLease(db,g,180103));
  }finally{db.close();}
+});
+test('늦게 확정된 사용량은 같은 게임 버전에서도 revision을 바꾸며 행 순서는 영향이 없다',async()=>{
+ const a={id:'a',detail:'{"costUsd":null}'},b={id:'b',detail:'{"costUsd":0.001}'};
+ assert.equal(await modelUsageRevision([a,b]),await modelUsageRevision([b,a]));
+ assert.notEqual(await modelUsageRevision([a]),await modelUsageRevision([{...a,detail:'{"costUsd":0.001}'}]));
 });
