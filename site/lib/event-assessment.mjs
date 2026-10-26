@@ -1,9 +1,10 @@
 import { IDS, observe } from './game.mjs';
 import { actionPayload, MINIMUM_EVIL_TEAM_GUIDANCE } from './action-selection.mjs';
 import { publicStanceGuidance } from './public-stance.mjs';
+import { PUBLIC_FACTS_GUIDANCE } from './public-facts.mjs';
 
 export const ASSESSMENT_VERSION = 'event-assessment-v1';
-export const ASSESSMENT_PROMPT_VERSION = 'event-assessment-leader-before-team-v5';
+export const ASSESSMENT_PROMPT_VERSION = 'event-assessment-leader-before-team-v6-public-facts';
 const fields = ['situation', 'advantage', 'basis', 'speechPlan', 'nextAction'];
 export const assessmentSchema = { type: 'OBJECT', required: ['type', 'assessment'], properties: {
   type: { type: 'STRING', enum: ['THINK'] },
@@ -40,7 +41,8 @@ ${beforeProposal ? '본인은 리더이며 지금 팀을 제안하거나 수정�
 악은 악끼리 작은 팀을 짤 때 정체 노출과 실패 카드 중복 위험을 다른 후보와 비교하고, 불리한 팀이면 공개 근거에 따른 설득/대체 팀을 검토하세요. 무조건 실패·반대하거나 악끼리 팀을 피하는 규칙은 아닙니다. 멀린은 원정 성공과 정체 은폐를 함께, 악은 실패/5회 부결과 마지막 암살 기회를 함께 고려하세요.
 ${['ASSASSIN','MINION'].includes(view.role) ? MINIMUM_EVIL_TEAM_GUIDANCE : ''}
 ${publicStanceGuidance(game.aiConfig)}
-state.public의 leader/team/phase와 afterCurrentResult를 확인하세요. 팀 제안자를 본인으로 착각하거나 팀에 없는 사람이 참여한다고 쓰지 마세요. 성공 3회 이후에는 새 원정 대신 암살 단계에 대비하세요.
+state.public의 leader/team/phase와 afterCurrentResult를 확인하세요. 팀 제안자를 본인으로 착각하거나 팀에 없는 사람이 참여한다고 쓰지 마세요.
+${PUBLIC_FACTS_GUIDANCE} 성공 3회 이후에는 새 원정 대신 암살 단계에 대비하세요.
 speechPlan은 공개적으로 말할 목적과 사용할 공개 근거를 적고 비밀을 직접 밝히지 마세요. 할 말이 없으면 그 이유를 적으세요. nextAction은 다음 팀/투표/카드/암살 중 현재 관련된 선택 기준을 적으세요. 계획은 JEV가 현재 관찰과 합법 후보를 대조할 참고이며 확정 선택 이유가 아닙니다.
 각 텍스트는 1~600자. JSON {"type":"THINK","assessment":{"situation":"상황","advantage":"FAVORABLE|BALANCED|UNFAVORABLE|UNCERTAIN","basis":"근거","speechPlan":"발언 계획 또는 불필요한 이유","nextAction":"다음 행동 계획"}}만 반환하세요.
 입력=${JSON.stringify({ trigger: game.pendingAssessment, role: view.role, state })}`;

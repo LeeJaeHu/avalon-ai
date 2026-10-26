@@ -8,7 +8,7 @@ function setup(){let g=createGame(()=>.5);g.leader='human';g=apply(g,'human',{ty
 
 test('사용자 V3 원문을 그대로 반영하고 필수 자리표시자·성향을 연결한다',()=>{
  assert.equal(TEMPLATE,readFileSync(new URL('../lib/prompts/v3.txt',import.meta.url),'utf8'));
- assert.equal(PROMPT_VERSION,'V3-speech-ownership-v7');const g=setup();
+ assert.equal(PROMPT_VERSION,'V3-public-facts-v8');const g=setup();
  const prompt=buildPromptV3({request:{type:'CHAT',actor:'ai1'},view:observe(g,'ai1'),publicState:observeModerator(g),personalInfo:{previousThinking:null}});
  assert.ok(prompt.includes('나의 목표, 인식한 현재 상황과 입장'));assert.ok(!prompt.includes('[공개 게임 상태 JSON]'));assert.ok(prompt.includes('"name":"하린"'));
 });

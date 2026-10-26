@@ -6,6 +6,7 @@ import {previousThinking} from './thinking-memory.mjs';
 import { ASSESSMENT_VERSION, ASSESSMENT_PROMPT_VERSION, nextAssessment, ownAssessment, assessmentPrompt, assessmentSchema, validateAssessment } from './event-assessment.mjs';
 import { selectAction, ACTION_TYPES, ownActions, voteExplanationContext } from './action-selection.mjs';
 import { publicStance, speechContext } from './public-stance.mjs';
+import { publicFacts } from './public-facts.mjs';
 import { roleGuessPending } from './role-guess.mjs';
 import { responseSchema } from './response-schema.mjs';
 import { evidenceReferenceIds, normalizeEvidence } from './evidence.mjs';
@@ -15,7 +16,7 @@ import { DEFAULT_GEMINI_MODEL,geminiModelId,geminiGeneration } from './gemini-mo
 import { conversationDueAt, conversationAction, progressDecision, humanNeedsReply, requiredDiscussionResponse } from './conversation.mjs';
 export { PROMPT_VERSION };
 
-export const AI_POLICY_VERSION = '2026-10-07.21-assessment-timing';
+export const AI_POLICY_VERSION = '2026-10-26.22-public-facts';
 export const AI_MODEL = DEFAULT_GEMINI_MODEL;
 const modelError = (code, message) => Object.assign(new Error(message), { code });
 
@@ -239,7 +240,8 @@ export async function decide(game, request, key, buildTurn = null, routingConfig
     publicStance: publicStance(game,request.actor), endgameExposureAllowed: game.aiConfig?.endgameExposureAllowed !== false,
     previousActions: ownActions(game,request.actor),
     ...(request.type==='CHAT'?{voteExplanation:voteExplanationContext(game,request.actor),speechContext:speechContext(game,request.actor,request)}:{}),
-    roleClues: roleClues(view, request.actor), evilBelief: evilPosterior(view, request.actor)
+    roleClues: roleClues(view, request.actor), evilBelief: evilPosterior(view, request.actor),
+    publicFacts: publicFacts(view, request.actor)
   };
   const referenceIds = turn?.input.request.evidenceReferenceIds ?? evidenceReferenceIds(publicState, personalInfo);
   const prompt = turn?.prompt ?? buildPromptV3({ request: { ...request, evidenceReferenceIds: referenceIds, replyMessage: replyMessage ? { ...replyMessage, name: NAMES[replyMessage.actor] } : null }, view, publicState, personalInfo });
